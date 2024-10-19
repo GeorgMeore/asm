@@ -358,6 +358,10 @@ void ret(Assembler *a)
 
 void *code(Assembler *a)
 {
+	for (Symbol *s = a->symtab; s; s = s->next) {
+		if (s->refs)
+			panic("found unresolved references");
+	}
 	void *p = mmap(0, a->ip, PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
 	memcpy(p, a->b, a->ip);
 	mprotect(p, a->ip, PROT_READ|PROT_EXEC);
