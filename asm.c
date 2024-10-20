@@ -232,38 +232,6 @@ void pushlabeloffset(Assembler *a, char *name)
 	}
 }
 
-typedef enum {
-	JA   = 0x87,
-	JAE  = 0x83,
-	JB   = 0x82,
-	JBE  = 0x86,
-	JC   = 0x82,
-	JE   = 0x84,
-	JG   = 0x8F,
-	JGE  = 0x8D,
-	JL   = 0x8C,
-	JLE  = 0x8E,
-	JNA  = 0x86,
-	JNAE = 0x82,
-	JNB  = 0x83,
-	JNBE = 0x87,
-	JNC  = 0x83,
-	JNE  = 0x85,
-	JNG  = 0x8E,
-	JNGE = 0x8C,
-	JNL  = 0x8D,
-	JNLE = 0x8F,
-	JNO  = 0x81,
-	JNP  = 0x8B,
-	JNS  = 0x89,
-	JNZ  = 0x85,
-	JO   = 0x80,
-	JP   = 0x8A,
-	JPE  = 0x8A,
-	JPO  = 0x8B,
-	JS   = 0x88,
-} Jcond;
-
 void jump(Assembler *a, Operand op, uchar oci, uchar ocl)
 {
 	if (op.type == OpReg) {
@@ -286,7 +254,7 @@ void jmp(Assembler *a, Operand op)
 	jump(a, op, 0b100, 0xE9);
 }
 
-void jcc(Assembler *a, Operand op, Jcond c)
+void jcc(Assembler *a, Operand op, uchar c)
 {
 	assert(op.type == OpLabel, "conditional jumps only work with labels");
 	pushbyte(a, 0x0F);
@@ -296,7 +264,7 @@ void jcc(Assembler *a, Operand op, Jcond c)
 
 void je(Assembler *a, Operand op)
 {
-	jcc(a, op, JE);
+	jcc(a, op, 0x84);
 }
 
 void call(Assembler *a, Operand op)
@@ -345,16 +313,7 @@ void mov(Assembler *a, Operand src, Operand dst)
 		panic("unsupported operand types");
 }
 
-typedef enum {
-	ArithAdd = 0b000,
-	ArithOr  = 0b001,
-	ArithAnd = 0b100,
-	ArithSub = 0b101,
-	ArithXor = 0b110,
-	ArithCmp = 0b111,
-} Arith;
-
-void arith(Assembler *a, Operand src, Operand dst, Arith op)
+void arith(Assembler *a, Operand src, Operand dst, uchar op)
 {
 	pushbyte(a, REXW);
 	if (src.type == OpReg && dst.type == OpReg) {
@@ -370,32 +329,43 @@ void arith(Assembler *a, Operand src, Operand dst, Arith op)
 
 void add(Assembler *a, Operand src, Operand dst)
 {
-	arith(a, src, dst, ArithAdd);
+	arith(a, src, dst, 0b000);
 }
 
 void or(Assembler *a, Operand src, Operand dst)
 {
-	arith(a, src, dst, ArithOr);
+	arith(a, src, dst, 0b001);
 }
 
 void and(Assembler *a, Operand src, Operand dst)
 {
-	arith(a, src, dst, ArithAnd);
+	arith(a, src, dst, 0b100);
 }
 
 void sub(Assembler *a, Operand src, Operand dst)
 {
-	arith(a, src, dst, ArithSub);
+	arith(a, src, dst, 0b101);
 }
 
 void xor(Assembler *a, Operand src, Operand dst)
 {
-	arith(a, src, dst, ArithXor);
+	arith(a, src, dst, 0b110);
 }
 
 void cmp(Assembler *a, Operand src, Operand dst)
 {
-	arith(a, src, dst, ArithCmp);
+	arith(a, src, dst, 0b111);
+}
+
+void lea(Assembler *a, Operand src, Operand dst)
+{
+	assert(dst.type == OpReg, "can only lea into registers");
+	assert(src.type == OpIndir, "only indirect register expressions supported");
+	pushbyte(a, REXW);
+	pushbyte(a, 0x8D);
+	pushbyte(a, modrm(ModDisp4, dst.reg, 0b100));
+	pushbyte(a, sib(Scale1, 0b100, src.reg));
+	pushbytes(a, src.v, 4);
 }
 
 void push(Assembler *a, Operand op)
