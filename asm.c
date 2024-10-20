@@ -400,13 +400,13 @@ void cmp(Assembler *a, Operand src, Operand dst)
 
 void push(Assembler *a, Operand op)
 {
-	assert(op.type == OpReg, "can only push registers");
+	assert(op.type == OpReg, "can only push from registers");
 	pushbyte(a, 0x50 + op.reg);
 }
 
 void pop(Assembler *a, Operand op)
 {
-	assert(op.type == OpReg, "can only push registers");
+	assert(op.type == OpReg, "can only pop to registers");
 	pushbyte(a, 0x58 + op.reg);
 }
 
