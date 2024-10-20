@@ -134,12 +134,19 @@ typedef enum {
 	ModDirect = 0b11,
 } Mod;
 
-uchar modrm(uchar mod, uchar reg, uchar rm)
+uchar modrm(Mod mod, uchar reg, uchar rm)
 {
 	return mod<<6 | reg<<3 | rm;
 }
 
-uchar sib(uchar scale, uchar index, uchar base)
+typedef enum {
+	Scale1 = 0b00,
+	Scale2 = 0b01,
+	Scale4 = 0b10,
+	Scale8 = 0b11,
+} Scale;
+
+uchar sib(Scale scale, uchar index, uchar base)
 {
 	return scale<<6 | index<<3 | base;
 }
@@ -212,8 +219,20 @@ void setlabel(Assembler *a, char *name)
 	}
 }
 
+void pushlabeloffset(Assembler *a, char *name)
+{
+	Symbol *s = getsym(a, name);
+	if (!s)
+		s = addsym(a, name);
+	if (s->resolved) {
+		pushbytes(a, s->addr - (a->ip+4), 4);
+	} else {
+		addref(s, a->ip);
+		pushbytes(a, 0, 4);
+	}
+}
+
 typedef enum {
-	JMP  = 0, /* unconditional */
 	JA   = 0x87,
 	JAE  = 0x83,
 	JB   = 0x82,
@@ -245,34 +264,44 @@ typedef enum {
 	JS   = 0x88,
 } Jcond;
 
-void jmpcond(Assembler *a, Operand op, Jcond c)
+void jump(Assembler *a, Operand op, uchar oci, uchar ocl)
 {
-	assert(op.type == OpLabel, "inderect jumps are not supported yet");
-	if (c == JMP) {
-		pushbyte(a, 0xE9);
-	} else {
-		pushbyte(a, 0x0F);
-		pushbyte(a, c);
-	}
-	Symbol *s = getsym(a, op.p);
-	if (!s)
-		s = addsym(a, op.p);
-	if (s->resolved) {
-		pushbytes(a, s->addr - (a->ip+4), 4);
-	} else {
-		addref(s, a->ip);
-		pushbytes(a, 0, 4);
-	}
-}
-
-void je(Assembler *a, Operand op)
-{
-	jmpcond(a, op, JE);
+	if (op.type == OpReg) {
+		pushbyte(a, 0xFF);
+		pushbyte(a, modrm(ModDirect, oci, op.reg));
+	} else if (op.type == OpIndir) {
+		pushbyte(a, 0xFF);
+		pushbyte(a, modrm(ModDisp4, oci, 0b100));
+		pushbyte(a, sib(Scale1, 0b100, op.reg));
+		pushbytes(a, op.v, 4);
+	} else if (op.type == OpLabel) {
+		pushbyte(a, ocl);
+		pushlabeloffset(a, op.p);
+	} else
+		panic("unsupported operand");
 }
 
 void jmp(Assembler *a, Operand op)
 {
-	jmpcond(a, op, JMP);
+	jump(a, op, 0b100, 0xE9);
+}
+
+void jcc(Assembler *a, Operand op, Jcond c)
+{
+	assert(op.type == OpLabel, "conditional jumps only work with labels");
+	pushbyte(a, 0x0F);
+	pushbyte(a, c);
+	pushlabeloffset(a, op.p);
+}
+
+void je(Assembler *a, Operand op)
+{
+	jcc(a, op, JE);
+}
+
+void call(Assembler *a, Operand op)
+{
+	jump(a, op, 0b010, 0xE8);
 }
 
 typedef enum {
@@ -291,7 +320,7 @@ void movregindir(Assembler *a, Operand reg, Operand indir, Direction d)
 {
 	pushbyte(a, 0x88 + d);
 	pushbyte(a, modrm(ModDisp4, reg.reg, 0b100));
-	pushbyte(a, sib(0b00, 0b100, indir.reg));
+	pushbyte(a, sib(Scale1, 0b100, indir.reg));
 	pushbytes(a, indir.v, 4);
 }
 
@@ -318,7 +347,10 @@ void mov(Assembler *a, Operand src, Operand dst)
 
 typedef enum {
 	ArithAdd = 0b000,
+	ArithOr  = 0b001,
+	ArithAnd = 0b100,
 	ArithSub = 0b101,
+	ArithXor = 0b110,
 	ArithCmp = 0b111,
 } Arith;
 
@@ -341,14 +373,41 @@ void add(Assembler *a, Operand src, Operand dst)
 	arith(a, src, dst, ArithAdd);
 }
 
+void or(Assembler *a, Operand src, Operand dst)
+{
+	arith(a, src, dst, ArithOr);
+}
+
+void and(Assembler *a, Operand src, Operand dst)
+{
+	arith(a, src, dst, ArithAnd);
+}
+
 void sub(Assembler *a, Operand src, Operand dst)
 {
 	arith(a, src, dst, ArithSub);
 }
 
+void xor(Assembler *a, Operand src, Operand dst)
+{
+	arith(a, src, dst, ArithXor);
+}
+
 void cmp(Assembler *a, Operand src, Operand dst)
 {
 	arith(a, src, dst, ArithCmp);
+}
+
+void push(Assembler *a, Operand op)
+{
+	assert(op.type == OpReg, "can only push registers");
+	pushbyte(a, 0x50 + op.reg);
+}
+
+void pop(Assembler *a, Operand op)
+{
+	assert(op.type == OpReg, "can only push registers");
+	pushbyte(a, 0x58 + op.reg);
 }
 
 void ret(Assembler *a)
@@ -384,14 +443,31 @@ setlabel(a, "return");
 	ret(a);
 }
 
+void sum(Assembler *a)
+{
+setlabel(a, "sum");
+	cmp(a, imm(0), rdi);
+	je(a, label("return0"));
+	push(a, rdi);
+	sub(a, imm(1), rdi);
+	call(a, label("sum"));
+	pop(a, rdi);
+	add(a, rdi, rax);
+	ret(a);
+setlabel(a, "return0");
+	xor(a, rax, rax);
+	ret(a);
+}
+
 int main(void)
 {
 	Assembler *a = asmb();
-	fib(a);
+	//fib(a);
+	sum(a);
 	//for (uint i = 0; i < a->ip; i++)
 	//	putchar(a->b[i]);
 	long (*f)(long) = code(a);
-	printf("%ld\n", f(1));
+	printf("%ld\n", f(6));
 	asmfree(a);
 	return 0;
 }
