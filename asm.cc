@@ -26,13 +26,13 @@ static void panic(const char *msg)
 }
 
 struct Ref {
-	Ref  *next;
-	uint addr;
+	Ref *next;
+	u32 addr;
 };
 
 struct Symbol {
 	Symbol     *next;
-	uint       addr;
+	u32        addr;
 	const char *name;
 	Ref        *refs;
 	int        resolved;
@@ -51,7 +51,7 @@ static void symfree(Symbol *s)
 	free(s);
 }
 
-static void addref(Symbol *s, uint addr)
+static void addref(Symbol *s, u32 addr)
 {
 	Ref *r = (Ref *)malloc(sizeof(*r));
 	r->next = s->refs;
@@ -62,8 +62,8 @@ static void addref(Symbol *s, uint addr)
 struct Assembler {
 	Symbol *symtab;
 	char   *b;
-	uint   cap;
-	uint   ip;
+	u32    cap;
+	u32    ip;
 };
 
 Assembler *asmb(void)
@@ -86,9 +86,9 @@ void asmfree(Assembler *a)
 	free(a);
 }
 
-static void patchbytes(Assembler *a, u64 addr, u64 v, u8 bytes)
+static void patchbytes(Assembler *a, u32 addr, u64 v, u8 bytes)
 {
-	for (uint i = 0; i < bytes; i++)
+	for (u32 i = 0; i < bytes; i++)
 		a->b[addr+i] = (v & (0xFFLU<<(i*8)))>>(i*8);
 }
 
@@ -257,15 +257,12 @@ static Mod mod(u8 offsetsize)
 	switch (offsetsize) {
 		case 0: return ModDisp0;
 		case 1: return ModDisp1;
+		default: // should never happen
 		case 4: return ModDisp4;
 	}
-	assert(0); // should never happen
 }
 
-static u8 modrm(Mod mod, u8 reg, u8 rm)
-{
-	return mod<<6 | reg<<3 | rm;
-}
+static u8 modrm(Mod mod, u8 reg, u8 rm) { return mod<<6 | reg<<3 | rm; }
 
 enum Scale {
 	Scale1 = 0b00,
@@ -280,17 +277,14 @@ static Scale scale(u8 scale)
 		case 1: return Scale1;
 		case 2: return Scale2;
 		case 4: return Scale4;
+		default: // should never happen
 		case 8: return Scale8;
 	}
-	assert(0); // should never happen
 }
 
-static u8 sib(Scale scale, u8 index, u8 base)
-{
-	return scale<<6 | index<<3 | base;
-}
+static u8 sib(Scale scale, u8 index, u8 base) { return scale<<6 | index<<3 | base; }
 
-static void rrm(Assembler *a, PTR p, R r, u8 op)
+static void ptrinst(Assembler *a, PTR p, R r, u8 op)
 {
 	if (size(p) == 32)
 		pushbyte(a, 0x67);
@@ -322,49 +316,68 @@ static void rrm(Assembler *a, PTR p, R r, u8 op)
 	pushbytes(a, p.offset, osz);
 }
 
-// TODO: handle 8 bit reg
-void mov(Assembler *a, PTR dst, R src) { rrm(a, dst, src, 0x89); }
-void mov(Assembler *a, R dst, PTR src) { rrm(a, src, dst, 0x8b); }
-
-void mov(Assembler *a, R dst, R src)
+static void rrinst(Assembler *a, R r1, R r2, u8 op)
 {
-	if (size(dst) != size(src))
+	if (size(r1) != size(r2))
 		panic("Invalid mov: register size mismatch");
-	if (size(src) == 32)
-		pushbyte(a, 0x67);
-	if (size(src) == 16)
+	if (size(r1) == 16)
 		pushbyte(a, 0x66);
 	u8 rex = 0;
-	if (size(src) == 64)
+	if (size(r1) == 64)
 		rex |= REXW;
-	rex |= isnew(src)*REXR | isnew(dst)*REXB;
+	rex |= isnew(r1)*REXR | isnew(r2)*REXB;
 	if (rex)
 		pushbyte(a, rex);
-	pushbyte(a, size(src) == 8 ? 0x88 : 0x89);
-	pushbyte(a, modrm(ModDirect, code(src), code(dst)));
+	pushbyte(a, op);
+	pushbyte(a, modrm(ModDirect, code(r1), code(r2)));
 }
 
-void lea(Assembler *a, R dst, PTR src) { rrm(a, src, dst, 0x8d); }
+void mov(Assembler *a, PTR dst, R src) { ptrinst(a, dst, src, 0x88 + (size(src) > 8)); }
+void mov(Assembler *a, R dst, PTR src) { ptrinst(a, src, dst, 0x8a + (size(dst) > 8)); }
+void mov(Assembler *a, R dst, R src) { rrinst(a, src, dst, 0x88 + (size(src) > 8)); }
 
-void push(Assembler *a, R r)
+void mov(Assembler *a, void *dst, R src)
 {
-	if (size(r) != 64)
-		panic("Invalid push: not a 64 bit register");
-	if (isnew(r))
-		pushbyte(a, REXB);
-	pushbyte(a, 0x50 + code(r));
+	if (code(src) != A)
+		panic("Invalid mov: expected the A register");
+	pushbyte(a, 0xA3);
+	pushbytes(a, (u64)dst, 8);
 }
 
-static void jcc(Assembler *a, const char *l, u8 c)
+void mov(Assembler *a, R dst, u64 src)
+{
+	if (size(dst) == 16)
+		pushbyte(a, 0x66);
+	u8 rex = 0;
+	if (size(dst) == 64)
+		rex |= REXW;
+	if (isnew(dst))
+		rex |= REXB;
+	if (rex)
+		pushbyte(a, rex);
+	pushbyte(a, size(dst) == 8 ? 0xB0 : 0xB8 + code(dst));
+	pushbytes(a, src, size(dst)/8);
+}
+
+void lea(Assembler *a, R dst, PTR src) { ptrinst(a, src, dst, 0x8d); }
+
+void add(Assembler *a, R dst, R src) { rrinst(a, src, dst, 0x0 + (size(src) > 8)); }
+void ori(Assembler *a, R dst, R src) { rrinst(a, src, dst, 0x8 + (size(src) > 8)); }
+void andi(Assembler *a, R dst, R src) { rrinst(a, src, dst, 0x20 + (size(src) > 8)); }
+
+enum Cond {
+	AE = 0x3,          // above or equal (CF=0)
+	Z = 0x4, EQ = 0x4, // equal (ZF=1)
+	AB = 0x7,          // above (CF=0 and ZF=0)
+};
+
+void jcc(Assembler *a, Cond c, const char *l)
 {
 	pushbyte(a, 0x0F);
-	pushbyte(a, c);
+	pushbyte(a, 0x80 + c);
 	pushlabeloffset(a, l);
 }
 
-void je(Assembler *a, const char *l) { jcc(a, l, 0x84); }
-
-// TODO: actually 16 bit registers are supposed to work for jumps
 void jmp(Assembler *a, R r)
 {
 	if (size(r) != 64)
@@ -375,22 +388,69 @@ void jmp(Assembler *a, R r)
 	pushbyte(a, modrm(ModDirect, 0b100, code(r)));
 }
 
-int main(void)
+void push(Assembler *a, R r)
 {
-	Assembler *a = asmb();
+	if (size(r) != 64)
+		panic("Invalid push: not a 64 bit register");
+	if (isnew(r))
+		pushbyte(a, REXB);
+	pushbyte(a, 0x50 + code(r));
+}
+
+void pop(Assembler *a, R r)
+{
+	if (size(r) != 64)
+		panic("Invalid pop: not a 64 bit register");
+	pushbyte(a, 0x58 + code(r));
+}
+
+void ret(Assembler *a) { pushbyte(a, 0xc3); }
+
+// TODO: cmov, call
+
+void test(Assembler *a)
+{
+	mov(a, r8, 123);
+	mov(a, r8d, 123);
+	mov(a, r8w, 123);
+	mov(a, r8b, 123);
 	mov(a, ptr(r12), rax);
 	mov(a, ptr(r12), r8w);
 	mov(a, ptr(rsp, rbp*2, -1), rax);
 	mov(a, rax, ptr(rsp, rbp*2, -1));
 	mov(a, ax, ptr(esp, ebp*2, -1));
+	mov(a, al, ptr(esp, ebp*2, -1));
+	mov(a, ptr(r8, r9*2, 5), r10b);
 	mov(a, rbx, r8);
 	mov(a, bx, ax);
 	mov(a, bl, al);
+	mov(a, eax, ecx);
+	mov(a, r8b, al);
 	push(a, rax);
 	push(a, r8);
+	pop(a, rax);
 	lea(a, rax, ptr(rsp, rbp*2, -1));
 	jmp(a, rax);
 	jmp(a, r12);
+label(a, "foo");
+	jcc(a, AB, "foo");
+	jcc(a, EQ, "foo");
+	add(a, rax, rbx);
+	add(a, eax, ecx);
+	add(a, al, r12b);
+	add(a, r13b, r8b);
+	ori(a, eax, ecx);
+	ori(a, al, r12b);
+	ori(a, r13b, r8b);
+	andi(a, eax, ecx);
+	andi(a, al, r12b);
+	andi(a, r13b, r8b);
+}
+
+int main(void)
+{
+	Assembler *a = asmb();
+	test(a);
 	for (u32 i = 0; i < a->ip; i++)
 		putchar(a->b[i]);
 	asmfree(a);
