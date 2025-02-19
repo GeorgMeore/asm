@@ -359,7 +359,12 @@ void mov(Assembler *a, R dst, u64 src)
 	pushbytes(a, src, size(dst)/8);
 }
 
-void lea(Assembler *a, R dst, PTR src) { ptrinst(a, src, dst, 0x8d); }
+void lea(Assembler *a, R dst, PTR src)
+{
+	if (size(dst) == 8)
+		panic("Invalid lea: cannot use 8 bit dst");
+	ptrinst(a, src, dst, 0x8d);
+}
 
 void add(Assembler *a, R dst, R src) { rrinst(a, src, dst, 0x0 + (size(src) > 8)); }
 void ori(Assembler *a, R dst, R src) { rrinst(a, src, dst, 0x8 + (size(src) > 8)); }
