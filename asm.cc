@@ -202,7 +202,7 @@ struct PTR {
 
 static u8 offsetsize(PTR p)
 {
-	if ((p.offset & 0xFF) != p.offset)
+	if (p.offset < -128 || p.offset > 127)
 		return 4;
 	if (p.offset || code(p.base) == 0b101)
 		return 1;
