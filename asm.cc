@@ -275,56 +275,56 @@ static Scale scale(u8 scale)
 
 static u8 sib(Scale scale, u8 index, u8 base) { return scale<<6 | index<<3 | base; }
 
-static void ptrinst(Assembler &a, PTR p, R r, u8 op)
+static void ptrinst(Assembler &a, R r, PTR rm, u8 op)
 {
-	if (size(p) == 32)
+	if (size(rm) == 32)
 		pushbyte(a, 0x67);
 	if (size(r) == 16)
 		pushbyte(a, 0x66);
 	u8 rex = 0;
 	if (size(r) == 64)
 		rex |= REXW;
-	rex |= isnew(r)*REXR | isnew(p.index)*REXX | isnew(p.base)*REXB;
+	rex |= isnew(r)*REXR | isnew(rm.index)*REXX | isnew(rm.base)*REXB;
 	if (rex)
 		pushbyte(a, rex);
 	pushbyte(a, op);
-	if (!size(p.base)) {
+	if (!size(rm.base)) {
 		pushbyte(a, modrm(ModDisp0, code(r), 0b100));
-		pushbyte(a, sib(scale(p.scale), code(p.index), 0b101));
-		pushbytes(a, p.offset, 4);
+		pushbyte(a, sib(scale(rm.scale), code(rm.index), 0b101));
+		pushbytes(a, rm.offset, 4);
 		return;
 	}
-	u8 osz = offsetsize(p);
-	if (!size(p.index) && code(p.base) != 0b100) {
-		pushbyte(a, modrm(mod(osz), code(r), code(p.base)));
+	u8 osz = offsetsize(rm);
+	if (!size(rm.index) && code(rm.base) != 0b100) {
+		pushbyte(a, modrm(mod(osz), code(r), code(rm.base)));
 	} else {
 		pushbyte(a, modrm(mod(osz), code(r), 0b100));
-		if (size(p.index))
-			pushbyte(a, sib(scale(p.scale), code(p.index), code(p.base)));
+		if (size(rm.index))
+			pushbyte(a, sib(scale(rm.scale), code(rm.index), code(rm.base)));
 		else
-			pushbyte(a, sib(Scale1, 0b100, code(p.base)));
+			pushbyte(a, sib(Scale1, 0b100, code(rm.base)));
 	}
-	pushbytes(a, p.offset, osz);
+	pushbytes(a, rm.offset, osz);
 }
 
-static void rrinst(Assembler &a, R r1, R r2, u8 op)
+static void rrinst(Assembler &a, R r, R rm, u8 op)
 {
-	if (size(r1) != size(r2))
+	if (size(r) != size(rm))
 		panic("Invalid mov: register size mismatch");
-	if (size(r1) == 16)
+	if (size(r) == 16)
 		pushbyte(a, 0x66);
 	u8 rex = 0;
-	if (size(r1) == 64)
+	if (size(r) == 64)
 		rex |= REXW;
-	rex |= isnew(r1)*REXR | isnew(r2)*REXB;
+	rex |= isnew(r)*REXR | isnew(rm)*REXB;
 	if (rex)
 		pushbyte(a, rex);
 	pushbyte(a, op);
-	pushbyte(a, modrm(ModDirect, code(r1), code(r2)));
+	pushbyte(a, modrm(ModDirect, code(r), code(rm)));
 }
 
-void mov(Assembler &a, PTR dst, R src) { ptrinst(a, dst, src, 0x88 + (size(src) > 8)); }
-void mov(Assembler &a, R dst, PTR src) { ptrinst(a, src, dst, 0x8a + (size(dst) > 8)); }
+void mov(Assembler &a, PTR dst, R src) { ptrinst(a, src, dst, 0x88 + (size(src) > 8)); }
+void mov(Assembler &a, R dst, PTR src) { ptrinst(a, dst, src, 0x8a + (size(dst) > 8)); }
 void mov(Assembler &a, R dst, R src) { rrinst(a, src, dst, 0x88 + (size(src) > 8)); }
 
 void mov(Assembler &a, void *dst, R src)
@@ -354,7 +354,7 @@ void lea(Assembler &a, R dst, PTR src)
 {
 	if (size(dst) == 8)
 		panic("Invalid lea: cannot use 8 bit dst");
-	ptrinst(a, src, dst, 0x8d);
+	ptrinst(a, dst, src, 0x8d);
 }
 
 static void arith(Assembler &a, R dst, R src, u8 op)
@@ -409,32 +409,38 @@ void jcc(Assembler &a, Cond c, const char *l)
 	pushlabeloffset(a, l);
 }
 
-void jmp(Assembler &a, R r)
+void jmp(Assembler &a, const char *dst)
 {
-	if (size(r) != 64)
+	pushbyte(a, 0xe9);
+	pushlabeloffset(a, dst);
+}
+
+void jmp(Assembler &a, R dst)
+{
+	if (size(dst) != 64)
 		panic("Invalid jump: not a 64 bit register");
-	if (isnew(r))
+	if (isnew(dst))
 		pushbyte(a, REXB);
 	pushbyte(a, 0xff);
-	pushbyte(a, modrm(ModDirect, 0b100, code(r)));
+	pushbyte(a, modrm(ModDirect, 0b100, code(dst)));
 }
 
-void push(Assembler &a, R r)
+void push(Assembler &a, R dst)
 {
-	if (size(r) != 64)
+	if (size(dst) != 64)
 		panic("Invalid push: not a 64 bit register");
-	if (isnew(r))
+	if (isnew(dst))
 		pushbyte(a, REXB);
-	pushbyte(a, 0x50 + code(r));
+	pushbyte(a, 0x50 + code(dst));
 }
 
-void pop(Assembler &a, R r)
+void pop(Assembler &a, R dst)
 {
-	if (size(r) != 64)
+	if (size(dst) != 64)
 		panic("Invalid pop: not a 64 bit register");
-	if (isnew(r))
+	if (isnew(dst))
 		pushbyte(a, REXB);
-	pushbyte(a, 0x58 + code(r));
+	pushbyte(a, 0x58 + code(dst));
 }
 
 void ret(Assembler &a) { pushbyte(a, 0xc3); }
