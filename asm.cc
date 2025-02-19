@@ -401,6 +401,8 @@ void pop(Assembler *a, R r)
 {
 	if (size(r) != 64)
 		panic("Invalid pop: not a 64 bit register");
+	if (isnew(r))
+		pushbyte(a, REXB);
 	pushbyte(a, 0x58 + code(r));
 }
 
