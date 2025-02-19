@@ -61,69 +61,60 @@ static void addref(Symbol *s, u32 addr)
 
 struct Assembler {
 	Symbol *symtab;
-	char   *b;
+	u8     *b;
 	u32    cap;
 	u32    ip;
 };
 
-Assembler *asmb(void)
+void clear(Assembler &a)
 {
-	Assembler *a = (Assembler *)malloc(sizeof(*a));
-	memset(a, 0, sizeof(*a));
-	a->cap = PAGE_SIZE;
-	a->b = (char *)malloc(a->cap);
-	return a;
-}
-
-void asmfree(Assembler *a)
-{
-	while (a->symtab) {
-		Symbol *s = a->symtab;
-		a->symtab = s->next;
+	while (a.symtab) {
+		Symbol *s = a.symtab;
+		a.symtab = s->next;
 		symfree(s);
 	}
-	free(a->b);
-	free(a);
+	free(a.b);
+	a = {};
 }
 
-static void patchbytes(Assembler *a, u32 addr, u64 v, u8 bytes)
+static void patchbytes(Assembler &a, u32 addr, u64 v, u8 bytes)
 {
 	for (u32 i = 0; i < bytes; i++)
-		a->b[addr+i] = (v & (0xFFLU<<(i*8)))>>(i*8);
+		a.b[addr+i] = (v & (0xfflu<<(i*8)))>>(i*8);
 }
 
-static void pushbytes(Assembler *a, u64 v, u8 bytes)
+static void pushbytes(Assembler &a, u64 v, u8 bytes)
 {
-	if (a->ip + bytes > a->cap) {
-		a->cap += PAGE_SIZE;
-		a->b = (char *)realloc(a->b, a->cap);
+	if (a.ip + bytes > a.cap) {
+		a.cap += PAGE_SIZE;
+		a.b = (u8 *)realloc(a.b, a.cap);
 	}
-	patchbytes(a, a->ip, v, bytes);
-	a->ip += bytes;
+	patchbytes(a, a.ip, v, bytes);
+	a.ip += bytes;
 }
 
-static void pushbyte(Assembler *a, u8 b)
+static void pushbyte(Assembler &a, u8 b)
 {
 	pushbytes(a, b, 1);
 }
 
-static Symbol *getsym(Assembler *a, const char *name)
+static Symbol *getsym(Assembler &a, const char *name)
 {
-	Symbol *s = a->symtab;
+	Symbol *s = a.symtab;
 	while (s && strcmp(name, s->name))
 		s = s->next;
 	return s;
 }
 
-static Symbol *addsym(Assembler *a, const char *name)
+static Symbol *addsym(Assembler &a, const char *name)
 {
 	Symbol *s = sym(name);
-	s->next = a->symtab;
-	a->symtab = s;
+	s->next = a.symtab;
+	a.symtab = s;
 	return s;
 }
 
-void label(Assembler *a, const char *name)
+void label(Assembler &a, const char *name)
 {
 	Symbol *s = getsym(a, name);
 	if (!s)
@@ -131,7 +122,7 @@ void label(Assembler *a, const char *name)
 	if (s->resolved)
 		panic("Assembly error: label already defined");
 	s->resolved = 1;
-	s->addr = a->ip;
+	s->addr = a.ip;
 	while (s->refs) {
 		Ref *r = s->refs;
 		s->refs = r->next;
@@ -140,15 +131,15 @@ void label(Assembler *a, const char *name)
 	}
 }
 
-static void pushlabeloffset(Assembler *a, const char *name)
+static void pushlabeloffset(Assembler &a, const char *name)
 {
 	Symbol *s = getsym(a, name);
 	if (!s)
 		s = addsym(a, name);
 	if (s->resolved) {
-		pushbytes(a, s->addr - (a->ip+4), 4);
+		pushbytes(a, s->addr - (a.ip+4), 4);
 	} else {
-		addref(s, a->ip);
+		addref(s, a.ip);
 		pushbytes(a, 0, 4);
 	}
 }
@@ -257,7 +248,7 @@ static Mod mod(u8 offsetsize)
 	switch (offsetsize) {
 		case 0: return ModDisp0;
 		case 1: return ModDisp1;
-		default: // should never happen
+		default: panic("Assembly error: invalid offset size"); // fallthrough
 		case 4: return ModDisp4;
 	}
 }
@@ -277,14 +268,14 @@ static Scale scale(u8 scale)
 		case 1: return Scale1;
 		case 2: return Scale2;
 		case 4: return Scale4;
-		default: // should never happen
+		default: panic("Assembly error: invalid scale"); // fallthrough
 		case 8: return Scale8;
 	}
 }
 
 static u8 sib(Scale scale, u8 index, u8 base) { return scale<<6 | index<<3 | base; }
 
-static void ptrinst(Assembler *a, PTR p, R r, u8 op)
+static void ptrinst(Assembler &a, PTR p, R r, u8 op)
 {
 	if (size(p) == 32)
 		pushbyte(a, 0x67);
@@ -316,7 +307,7 @@ static void ptrinst(Assembler *a, PTR p, R r, u8 op)
 	pushbytes(a, p.offset, osz);
 }
 
-static void rrinst(Assembler *a, R r1, R r2, u8 op)
+static void rrinst(Assembler &a, R r1, R r2, u8 op)
 {
 	if (size(r1) != size(r2))
 		panic("Invalid mov: register size mismatch");
@@ -332,19 +323,19 @@ static void rrinst(Assembler *a, R r1, R r2, u8 op)
 	pushbyte(a, modrm(ModDirect, code(r1), code(r2)));
 }
 
-void mov(Assembler *a, PTR dst, R src) { ptrinst(a, dst, src, 0x88 + (size(src) > 8)); }
-void mov(Assembler *a, R dst, PTR src) { ptrinst(a, src, dst, 0x8a + (size(dst) > 8)); }
-void mov(Assembler *a, R dst, R src) { rrinst(a, src, dst, 0x88 + (size(src) > 8)); }
+void mov(Assembler &a, PTR dst, R src) { ptrinst(a, dst, src, 0x88 + (size(src) > 8)); }
+void mov(Assembler &a, R dst, PTR src) { ptrinst(a, src, dst, 0x8a + (size(dst) > 8)); }
+void mov(Assembler &a, R dst, R src) { rrinst(a, src, dst, 0x88 + (size(src) > 8)); }
 
-void mov(Assembler *a, void *dst, R src)
+void mov(Assembler &a, void *dst, R src)
 {
 	if (code(src) != A)
 		panic("Invalid mov: expected the A register");
-	pushbyte(a, 0xA3);
+	pushbyte(a, 0xa3);
 	pushbytes(a, (u64)dst, 8);
 }
 
-void mov(Assembler *a, R dst, u64 src)
+void mov(Assembler &a, R dst, u64 src)
 {
 	if (size(dst) == 16)
 		pushbyte(a, 0x66);
@@ -355,20 +346,20 @@ void mov(Assembler *a, R dst, u64 src)
 		rex |= REXB;
 	if (rex)
 		pushbyte(a, rex);
-	pushbyte(a, size(dst) == 8 ? 0xB0 : 0xB8 + code(dst));
+	pushbyte(a, size(dst) == 8 ? 0xb0 : 0xb8 + code(dst));
 	pushbytes(a, src, size(dst)/8);
 }
 
-void lea(Assembler *a, R dst, PTR src)
+void lea(Assembler &a, R dst, PTR src)
 {
 	if (size(dst) == 8)
 		panic("Invalid lea: cannot use 8 bit dst");
 	ptrinst(a, src, dst, 0x8d);
 }
 
-void add(Assembler *a, R dst, R src) { rrinst(a, src, dst, 0x0 + (size(src) > 8)); }
-void ori(Assembler *a, R dst, R src) { rrinst(a, src, dst, 0x8 + (size(src) > 8)); }
-void andi(Assembler *a, R dst, R src) { rrinst(a, src, dst, 0x20 + (size(src) > 8)); }
+void add(Assembler &a, R dst, R src) { rrinst(a, src, dst, 0x0 + (size(src) > 8)); }
+void ori(Assembler &a, R dst, R src) { rrinst(a, src, dst, 0x8 + (size(src) > 8)); }
+void andi(Assembler &a, R dst, R src) { rrinst(a, src, dst, 0x20 + (size(src) > 8)); }
 
 enum Cond {
 	AE = 0x3,          // above or equal (CF=0)
@@ -376,24 +367,24 @@ enum Cond {
 	AB = 0x7,          // above (CF=0 and ZF=0)
 };
 
-void jcc(Assembler *a, Cond c, const char *l)
+void jcc(Assembler &a, Cond c, const char *l)
 {
-	pushbyte(a, 0x0F);
+	pushbyte(a, 0x0f);
 	pushbyte(a, 0x80 + c);
 	pushlabeloffset(a, l);
 }
 
-void jmp(Assembler *a, R r)
+void jmp(Assembler &a, R r)
 {
 	if (size(r) != 64)
 		panic("Invalid jump: not a 64 bit register");
 	if (isnew(r))
 		pushbyte(a, REXB);
-	pushbyte(a, 0xFF);
+	pushbyte(a, 0xff);
 	pushbyte(a, modrm(ModDirect, 0b100, code(r)));
 }
 
-void push(Assembler *a, R r)
+void push(Assembler &a, R r)
 {
 	if (size(r) != 64)
 		panic("Invalid push: not a 64 bit register");
@@ -402,7 +393,7 @@ void push(Assembler *a, R r)
 	pushbyte(a, 0x50 + code(r));
 }
 
-void pop(Assembler *a, R r)
+void pop(Assembler &a, R r)
 {
 	if (size(r) != 64)
 		panic("Invalid pop: not a 64 bit register");
@@ -411,55 +402,89 @@ void pop(Assembler *a, R r)
 	pushbyte(a, 0x58 + code(r));
 }
 
-void ret(Assembler *a) { pushbyte(a, 0xc3); }
+void ret(Assembler &a) { pushbyte(a, 0xc3); }
 
 // TODO: cmov, call
 
-void test(Assembler *a)
+void *map(Assembler &a)
 {
-	mov(a, r8, 123);
-	mov(a, r8d, 123);
-	mov(a, r8w, 123);
-	mov(a, r8b, 123);
-	mov(a, ptr(r12), rax);
-	mov(a, ptr(r12), r8w);
-	mov(a, ptr(rsp, rbp*2, -1), rax);
-	mov(a, rax, ptr(rsp, rbp*2, -1));
-	mov(a, ax, ptr(esp, ebp*2, -1));
-	mov(a, al, ptr(esp, ebp*2, -1));
-	mov(a, ptr(r8, r9*2, 5), r10b);
-	mov(a, rbx, r8);
-	mov(a, bx, ax);
-	mov(a, bl, al);
-	mov(a, eax, ecx);
-	mov(a, r8b, al);
-	push(a, rax);
-	push(a, r8);
-	pop(a, rax);
-	lea(a, rax, ptr(rsp, rbp*2, -1));
-	jmp(a, rax);
-	jmp(a, r12);
+	for (Symbol *s = a.symtab; s; s = s->next) {
+		if (s->refs)
+			panic("Assembly error: found unresolved references");
+	}
+	void *p = mmap(0, a.ip, PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
+	memcpy(p, a.b, a.ip);
+	mprotect(p, a.ip, PROT_READ|PROT_EXEC);
+	return p;
+}
+
+void expect(const Assembler &a, const u8 b[], u64 s, const char *file, int line)
+{
+	for (u8 i = 0; i < s; i++) {
+		if (a.ip < i || a.b[a.ip-1-i] != b[s-1-i]) {
+			printf("Test failed: %s:%d\n", file, line);
+			exit(1);
+		}
+	}
+}
+
+#define expect(a, ...) expect(a, (u8[])__VA_ARGS__, sizeof((u8[])__VA_ARGS__), __FILE__, __LINE__)
+
+void test(void)
+{
+	Assembler a{};
+	// instruction                      // expected byte sequence
+	mov(a, r9, 123);                    expect(a, {0x49, 0xb9, 0x7b, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00});
+	mov(a, r8d, 123);                   expect(a, {0x41, 0xb8, 0x7b, 0x00, 0x00, 0x00});
+	mov(a, r8w, 123);                   expect(a, {0x66, 0x41, 0xb8, 0x7b, 0x00});
+	mov(a, r8b, 123);                   expect(a, {0x41, 0xb0, 0x7b});
+	mov(a, ptr(r12), rax);              expect(a, {0x49, 0x89, 0x04, 0x24});
+	mov(a, ptr(r12), r8w);              expect(a, {0x66, 0x45, 0x89, 0x04, 0x24});
+	mov(a, ptr(rsp, rbp*2, -1), rax);   expect(a, {0x48, 0x89, 0x44, 0x6c, 0xff});
+	mov(a, rax, ptr(rsp, rbp*2, -1));   expect(a, {0x48, 0x8b, 0x44, 0x6c, 0xff});
+	mov(a, ax, ptr(esp, ebp*2, -128));  expect(a, {0x67, 0x66, 0x8b, 0x44, 0x6c, 0x80});
+	mov(a, al, ptr(esp, ebp*2, 127));   expect(a, {0x67, 0x8a, 0x44, 0x6c, 0x7f});
+	mov(a, ptr(r8, r9*2, 128), r10b);   expect(a, {0x47, 0x88, 0x94, 0x48, 0x80, 0x00, 0x00, 0x00});
+	mov(a, rbx, r8);                    expect(a, {0x4c, 0x89, 0xc3});
+	mov(a, bx, ax);                     expect(a, {0x66, 0x89, 0xc3});
+	mov(a, bl, al);                     expect(a, {0x88, 0xc3});
+	mov(a, eax, ecx);                   expect(a, {0x89, 0xc8});
+	mov(a, r8b, al);                    expect(a, {0x41, 0x88, 0xc0});
+	push(a, rax);                       expect(a, {0x50});
+	push(a, r8);                        expect(a, {0x41, 0x50});
+	pop(a, r8);                         expect(a, {0x41, 0x58});
+	pop(a, rax);                        expect(a, {0x58});
+	lea(a, rax, ptr(rsp, rbp*2, -129)); expect(a, {0x48, 0x8d, 0x84, 0x6c, 0x7f, 0xff, 0xff, 0xff});
+	lea(a, eax, ptr(rsp, rbp*2, 45));   expect(a, {0x8d, 0x44, 0x6c, 0x2d});
+	lea(a, r12w, ptr(rsp, rbp*2, 255)); expect(a, {0x66, 0x44, 0x8d, 0xa4, 0x6c, 0xff, 0x00, 0x00, 0x00});
+	jmp(a, rax);                        expect(a, {0xff, 0xe0});
+	jmp(a, r12);                        expect(a, {0x41, 0xff, 0xe4});
 label(a, "foo");
-	jcc(a, AB, "foo");
-	jcc(a, EQ, "foo");
-	add(a, rax, rbx);
-	add(a, eax, ecx);
-	add(a, al, r12b);
-	add(a, r13b, r8b);
-	ori(a, eax, ecx);
-	ori(a, al, r12b);
-	ori(a, r13b, r8b);
-	andi(a, eax, ecx);
-	andi(a, al, r12b);
-	andi(a, r13b, r8b);
+	jcc(a, AB, "foo");                  expect(a, {0x0f, 0x87, 0xfa, 0xff, 0xff, 0xff});
+	jcc(a, EQ, "foo");                  expect(a, {0x0f, 0x84, 0xf4, 0xff, 0xff, 0xff});
+	add(a, rax, rbx);                   expect(a, {0x48, 0x01, 0xd8});
+	add(a, eax, ecx);                   expect(a, {0x01, 0xc8});
+	add(a, al, r12b);                   expect(a, {0x44, 0x00, 0xe0});
+	add(a, r13b, r8b);                  expect(a, {0x45, 0x00, 0xc5});
+	ori(a, eax, ecx);                   expect(a, {0x09, 0xc8});
+	ori(a, al, r12b);                   expect(a, {0x44, 0x08, 0xe0});
+	ori(a, r13b, r8b);                  expect(a, {0x45, 0x08, 0xc5});
+	andi(a, eax, ecx);                  expect(a, {0x21, 0xc8});
+	andi(a, al, r12b);                  expect(a, {0x44, 0x20, 0xe0});
+	andi(a, r13b, r8b);                 expect(a, {0x45, 0x20, 0xc5});
+	clear(a);
 }
 
 int main(void)
 {
-	Assembler *a = asmb();
-	test(a);
-	for (u32 i = 0; i < a->ip; i++)
-		putchar(a->b[i]);
-	asmfree(a);
+	test();
+	Assembler a{};
+	if (0) {
+		void (*f)() = (void(*)())map(a);
+		f();
+	}
+	for (u32 i = 0; i < a.ip; i++)
+		putchar(a.b[i]);
+	clear(a);
 	return 0;
 }
