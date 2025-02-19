@@ -275,6 +275,27 @@ static Scale scale(u8 scale)
 
 static u8 sib(Scale scale, u8 index, u8 base) { return scale<<6 | index<<3 | base; }
 
+static void pushmodsib(Assembler &a, u8 reg, PTR p)
+{
+	if (!size(p.base)) {
+		pushbyte(a, modrm(ModDisp0, reg, 0b100));
+		pushbyte(a, sib(scale(p.scale), code(p.index), 0b101));
+		pushbytes(a, p.offset, 4);
+		return;
+	}
+	u8 osz = offsetsize(p);
+	if (!size(p.index) && code(p.base) != 0b100) {
+		pushbyte(a, modrm(mod(osz), reg, code(p.base)));
+	} else {
+		pushbyte(a, modrm(mod(osz), reg, 0b100));
+		if (size(p.index))
+			pushbyte(a, sib(scale(p.scale), code(p.index), code(p.base)));
+		else
+			pushbyte(a, sib(Scale1, 0b100, code(p.base)));
+	}
+	pushbytes(a, p.offset, osz);
+}
+
 static void ptrinst(Assembler &a, R r, PTR rm, u8 op)
 {
 	if (size(rm) == 32)
@@ -288,23 +309,7 @@ static void ptrinst(Assembler &a, R r, PTR rm, u8 op)
 	if (rex)
 		pushbyte(a, rex);
 	pushbyte(a, op);
-	if (!size(rm.base)) {
-		pushbyte(a, modrm(ModDisp0, code(r), 0b100));
-		pushbyte(a, sib(scale(rm.scale), code(rm.index), 0b101));
-		pushbytes(a, rm.offset, 4);
-		return;
-	}
-	u8 osz = offsetsize(rm);
-	if (!size(rm.index) && code(rm.base) != 0b100) {
-		pushbyte(a, modrm(mod(osz), code(r), code(rm.base)));
-	} else {
-		pushbyte(a, modrm(mod(osz), code(r), 0b100));
-		if (size(rm.index))
-			pushbyte(a, sib(scale(rm.scale), code(rm.index), code(rm.base)));
-		else
-			pushbyte(a, sib(Scale1, 0b100, code(rm.base)));
-	}
-	pushbytes(a, rm.offset, osz);
+	pushmodsib(a, code(r), rm);
 }
 
 static void rrinst(Assembler &a, R r, R rm, u8 op)
@@ -327,14 +332,6 @@ void mov(Assembler &a, PTR dst, R src) { ptrinst(a, src, dst, 0x88 + (size(src) 
 void mov(Assembler &a, R dst, PTR src) { ptrinst(a, dst, src, 0x8a + (size(dst) > 8)); }
 void mov(Assembler &a, R dst, R src) { rrinst(a, src, dst, 0x88 + (size(src) > 8)); }
 
-void mov(Assembler &a, void *dst, R src)
-{
-	if (code(src) != A)
-		panic("Invalid mov: expected the A register");
-	pushbyte(a, 0xa3);
-	pushbytes(a, (u64)dst, 8);
-}
-
 void mov(Assembler &a, R dst, u64 src)
 {
 	if (size(dst) == 16)
@@ -348,6 +345,30 @@ void mov(Assembler &a, R dst, u64 src)
 		pushbyte(a, rex);
 	pushbyte(a, size(dst) == 8 ? 0xb0 : 0xb8 + code(dst));
 	pushbytes(a, src, size(dst)/8);
+}
+
+void mov(Assembler &a, R dst, void *src)
+{
+	if (dst.code != A)
+		panic("Invalid mov: A register expected");
+	if (size(dst) == 16)
+		pushbyte(a, 0x66);
+	if (size(dst) == 64)
+		pushbyte(a, REXW);
+	pushbyte(a, 0xA0 + (size(dst) > 8));
+	pushbytes(a, (u64)src, 8);
+}
+
+void mov(Assembler &a, void *dst, R src)
+{
+	if (src.code != A)
+		panic("Invalid mov: A register expected");
+	if (size(src) == 16)
+		pushbyte(a, 0x66);
+	if (size(src) == 64)
+		pushbyte(a, REXW);
+	pushbyte(a, 0xA2 + (size(src) > 8));
+	pushbytes(a, (u64)dst, 8);
 }
 
 void lea(Assembler &a, R dst, PTR src)
@@ -409,21 +430,39 @@ void jcc(Assembler &a, Cond c, const char *l)
 	pushlabeloffset(a, l);
 }
 
-void jmp(Assembler &a, const char *dst)
+static void jump(Assembler &a, const char *dst, u8 op)
 {
-	pushbyte(a, 0xe9);
+	pushbyte(a, op);
 	pushlabeloffset(a, dst);
 }
 
-void jmp(Assembler &a, R dst)
+static void jump(Assembler &a, PTR dst, u8 op)
+{
+	if (size(dst) == 32)
+		pushbyte(a, 0x67);
+	u8 rex = isnew(dst.index)*REXX | isnew(dst.base)*REXB;
+	if (rex)
+		pushbyte(a, rex);
+	pushbyte(a, 0xFF);
+	pushmodsib(a, op, dst);
+}
+
+static void jump(Assembler &a, R dst, u8 op)
 {
 	if (size(dst) != 64)
 		panic("Invalid jump: not a 64 bit register");
 	if (isnew(dst))
 		pushbyte(a, REXB);
 	pushbyte(a, 0xff);
-	pushbyte(a, modrm(ModDirect, 0b100, code(dst)));
+	pushbyte(a, modrm(ModDirect, op, code(dst)));
 }
+
+void jmp(Assembler &a, const char *dst) { jump(a, dst, 0xe9); }
+void jmp(Assembler &a, PTR dst) { jump(a, dst, 0b100); }
+void jmp(Assembler &a, R dst) { jump(a, dst, 0b100); }
+void call(Assembler &a, const char *dst) { jump(a, dst, 0xe8); }
+void call(Assembler &a, PTR dst) { jump(a, dst, 0b010); }
+void call(Assembler &a, R dst) { jump(a, dst, 0b010); }
 
 void push(Assembler &a, R dst)
 {
@@ -445,7 +484,7 @@ void pop(Assembler &a, R dst)
 
 void ret(Assembler &a) { pushbyte(a, 0xc3); }
 
-// TODO: cmov, jmp(ptr), call, mov(void *)
+// TODO: cmov
 
 void *map(Assembler &a)
 {
@@ -518,6 +557,20 @@ label(a, "foo");
 	add(a, r12, 588);                   expect(a, {0x49, 0x81, 0xc4, 0x4c, 0x02, 0x00, 0x00});
 	add(a, r12w, 588);                  expect(a, {0x66, 0x41, 0x81, 0xc4, 0x4c, 0x02});
 	add(a, r12b, 588);                  expect(a, {0x41, 0x80, 0xc4, 0x4c});
+	mov(a, rax, (void*)0xffff88000023); expect(a, {0x48, 0xa1, 0x23, 0x00, 0x00, 0x88, 0xff, 0xff, 0x00, 0x00});
+	mov(a, eax, (void*)0xffff88000023); expect(a, {0xa1, 0x23, 0x00, 0x00, 0x88, 0xff, 0xff, 0x00, 0x00});
+	mov(a, ax, (void*)0xffff88000023);  expect(a, {0x66, 0xa1, 0x23, 0x00, 0x00, 0x88, 0xff, 0xff, 0x00, 0x00});
+	mov(a, al, (void*)0xffff88000023);  expect(a, {0xa0, 0x23, 0x00, 0x00, 0x88, 0xff, 0xff, 0x00, 0x00});
+	mov(a, (void*)0xffff88000023, rax); expect(a, {0x48, 0xa3, 0x23, 0x00, 0x00, 0x88, 0xff, 0xff, 0x00, 0x00});
+	mov(a, (void*)0xffff88000023, eax); expect(a, {0xa3, 0x23, 0x00, 0x00, 0x88, 0xff, 0xff, 0x00, 0x00});
+	mov(a, (void*)0xffff88000023, ax);  expect(a, {0x66, 0xa3, 0x23, 0x00, 0x00, 0x88, 0xff, 0xff, 0x00, 0x00});
+	mov(a, (void*)0xffff88000023, al);  expect(a, {0xa2, 0x23, 0x00, 0x00, 0x88, 0xff, 0xff, 0x00, 0x00});
+	jmp(a, ptr(eax, ebx*4, 5));         expect(a, {0x67, 0xff, 0x64, 0x98, 0x05});
+	jmp(a, ptr(rcx, r9*8, -5));         expect(a, {0x42, 0xff, 0x64, 0xc9, 0xfb});
+	call(a, rax);                       expect(a, {0xff, 0xd0});
+	call(a, r12);                       expect(a, {0x41, 0xff, 0xd4});
+	call(a, ptr(eax, ebx*4, 5));        expect(a, {0x67, 0xff, 0x54, 0x98, 0x05});
+	call(a, ptr(rcx, r9*8, -5));        expect(a, {0x42, 0xff, 0x54, 0xc9, 0xfb});
 	printf("OK\n");
 	clear(a);
 }
