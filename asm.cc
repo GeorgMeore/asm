@@ -357,9 +357,44 @@ void lea(Assembler &a, R dst, PTR src)
 	ptrinst(a, src, dst, 0x8d);
 }
 
-void add(Assembler &a, R dst, R src) { rrinst(a, src, dst, 0x0 + (size(src) > 8)); }
-void ori(Assembler &a, R dst, R src) { rrinst(a, src, dst, 0x8 + (size(src) > 8)); }
-void andi(Assembler &a, R dst, R src) { rrinst(a, src, dst, 0x20 + (size(src) > 8)); }
+static void arith(Assembler &a, R dst, R src, u8 op)
+{
+	rrinst(a, src, dst, (op << 3) + (size(src) > 8));
+}
+
+static void arith(Assembler &a, R dst, u32 src, u8 op)
+{
+	if (size(dst) == 16)
+		pushbyte(a, 0x66);
+	u8 rex = 0;
+	if (size(dst) == 64)
+		rex |= REXW;
+	if (isnew(dst))
+		rex |= REXB;
+	if (rex)
+		pushbyte(a, rex);
+	if (dst.code == A) {
+		pushbyte(a, 0x05);
+	} else {
+		pushbyte(a, 0x80 + (size(dst) > 8));
+		pushbyte(a, modrm(ModDirect, op, code(dst)));
+	}
+	if (size(dst) == 64)
+		pushbytes(a, src, 4);
+	else
+		pushbytes(a, src, size(dst)/8);
+}
+
+void add(Assembler &a, R dst, R src) { arith(a, dst, src, 0b000); }
+void add(Assembler &a, R dst, u32 src) { arith(a, dst, src, 0b000); }
+void or_(Assembler &a, R dst, R src) { arith(a, dst, src, 0b001); }
+void or_(Assembler &a, R dst, u32 src) { arith(a, dst, src, 0b001); }
+void and_(Assembler &a, R dst, R src) { arith(a, dst, src, 0b100); }
+void and_(Assembler &a, R dst, u32 src) { arith(a, dst, src, 0b100); }
+void sub(Assembler &a, R dst, R src) { arith(a, dst, src, 0b101); }
+void xor_(Assembler &a, R dst, u32 src) { arith(a, dst, src, 0b110); }
+void cmp(Assembler &a, R dst, R src) { arith(a, dst, src, 0b111); }
+void cmp(Assembler &a, R dst, u32 src) { arith(a, dst, src, 0b111); }
 
 enum Cond {
 	AE = 0x3,          // above or equal (CF=0)
@@ -404,7 +439,7 @@ void pop(Assembler &a, R r)
 
 void ret(Assembler &a) { pushbyte(a, 0xc3); }
 
-// TODO: cmov, call
+// TODO: cmov, jmp(ptr), call, mov(void *)
 
 void *map(Assembler &a)
 {
@@ -466,12 +501,18 @@ label(a, "foo");
 	add(a, eax, ecx);                   expect(a, {0x01, 0xc8});
 	add(a, al, r12b);                   expect(a, {0x44, 0x00, 0xe0});
 	add(a, r13b, r8b);                  expect(a, {0x45, 0x00, 0xc5});
-	ori(a, eax, ecx);                   expect(a, {0x09, 0xc8});
-	ori(a, al, r12b);                   expect(a, {0x44, 0x08, 0xe0});
-	ori(a, r13b, r8b);                  expect(a, {0x45, 0x08, 0xc5});
-	andi(a, eax, ecx);                  expect(a, {0x21, 0xc8});
-	andi(a, al, r12b);                  expect(a, {0x44, 0x20, 0xe0});
-	andi(a, r13b, r8b);                 expect(a, {0x45, 0x20, 0xc5});
+	or_(a, eax, ecx);                   expect(a, {0x09, 0xc8});
+	or_(a, al, r12b);                   expect(a, {0x44, 0x08, 0xe0});
+	or_(a, r13b, r8b);                  expect(a, {0x45, 0x08, 0xc5});
+	and_(a, eax, ecx);                  expect(a, {0x21, 0xc8});
+	and_(a, al, r12b);                  expect(a, {0x44, 0x20, 0xe0});
+	and_(a, r13b, r8b);                 expect(a, {0x45, 0x20, 0xc5});
+	add(a, rax, 588);                   expect(a, {0x48, 0x05, 0x4c, 0x02, 0x00, 0x00});
+	add(a, rbx, 588);                   expect(a, {0x48, 0x81, 0xc3, 0x4c, 0x02, 0x00, 0x00});
+	add(a, r12, 588);                   expect(a, {0x49, 0x81, 0xc4, 0x4c, 0x02, 0x00, 0x00});
+	add(a, r12w, 588);                  expect(a, {0x66, 0x41, 0x81, 0xc4, 0x4c, 0x02});
+	add(a, r12b, 588);                  expect(a, {0x41, 0x80, 0xc4, 0x4c});
+	printf("OK\n");
 	clear(a);
 }
 
