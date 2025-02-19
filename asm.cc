@@ -151,6 +151,8 @@ enum RCode {
 	B   = 0b0011,
 	SP  = 0b0100,
 	BP  = 0b0101,
+	SI  = 0b0110,
+	DI  = 0b0111,
 	R8  = 0b1000,
 	R9  = 0b1001,
 	R10 = 0b1010,
@@ -220,6 +222,8 @@ const R rdx = {D,   64}, edx  = {D,   32}, dx   = {D,   16}, dl   = {D,   8};
 const R rbx = {B,   64}, ebx  = {B,   32}, bx   = {B,   16}, bl   = {B,   8};
 const R rsp = {SP,  64}, esp  = {SP,  32}, sp   = {SP,  16}, spl  = {SP,  8};
 const R rbp = {BP,  64}, ebp  = {BP,  32}, bp   = {BP,  16}, bpl  = {BP,  8};
+const R rsi = {SI,  64}, esi  = {SI,  32}, si   = {SI,  16}, sil  = {SI,  8};
+const R rdi = {DI,  64}, edi  = {DI,  32}, di   = {DI,  16}, dil  = {DI,  8};
 const R r8  = {R8,  64}, r8d  = {R8,  32}, r8w  = {R8,  16}, r8b  = {R8,  8};
 const R r9  = {R9,  64}, r9d  = {R9,  32}, r9w  = {R9,  16}, r9b  = {R9,  8};
 const R r10 = {R10, 64}, r10d = {R10, 32}, r10w = {R10, 16}, r10b = {R10, 8};
@@ -413,6 +417,8 @@ void or_(Assembler &a, R dst, u32 src) { arith(a, dst, src, 0b001); }
 void and_(Assembler &a, R dst, R src) { arith(a, dst, src, 0b100); }
 void and_(Assembler &a, R dst, u32 src) { arith(a, dst, src, 0b100); }
 void sub(Assembler &a, R dst, R src) { arith(a, dst, src, 0b101); }
+void sub(Assembler &a, R dst, u32 src) { arith(a, dst, src, 0b101); }
+void xor_(Assembler &a, R dst, R src) { arith(a, dst, src, 0b110); }
 void xor_(Assembler &a, R dst, u32 src) { arith(a, dst, src, 0b110); }
 void cmp(Assembler &a, R dst, R src) { arith(a, dst, src, 0b111); }
 void cmp(Assembler &a, R dst, u32 src) { arith(a, dst, src, 0b111); }
@@ -575,16 +581,49 @@ label(a, "foo");
 	clear(a);
 }
 
+void fib(Assembler &a)
+{
+	mov(a, rax, 1);
+	mov(a, rcx, (u64)0);
+label(a, "loop");
+	cmp(a, rdi, 0);
+	jcc(a, EQ, "return");
+	mov(a, rdx, rcx);
+	add(a, rcx, rax);
+	mov(a, rax, rdx);
+	sub(a, rdi, 1);
+	jmp(a, "loop");
+label(a, "return");
+	ret(a);
+}
+
+void sum(Assembler &a)
+{
+label(a, "sum");
+	cmp(a, rdi, 0);
+	jcc(a, EQ, "return0");
+	push(a, rdi);
+	sub(a, rdi, 1);
+	call(a, "sum");
+	pop(a, rdi);
+	add(a, rax, rdi);
+	ret(a);
+label(a, "return0");
+	xor_(a, rax, rax);
+	ret(a);
+}
+
 int main(void)
 {
-	test();
+	//test();
 	Assembler a{};
-	if (0) {
-		void (*f)() = (void(*)())map(a);
-		f();
+	fib(a);
+	if (1) {
+		u64 (*f)(u64) = (u64(*)(u64))map(a);
+		printf("%lu\n", f(7));
 	}
-	for (u32 i = 0; i < a.ip; i++)
-		putchar(a.b[i]);
+	//for (u32 i = 0; i < a.ip; i++)
+	//	putchar(a.b[i]);
 	clear(a);
 	return 0;
 }
