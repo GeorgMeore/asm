@@ -37,6 +37,7 @@ struct PTR {
 PTR ptr(R base, I i, s32 offset = 0);
 PTR ptr(R base, s32 offset = 0);
 PTR ptr(I i, s32 offset = 0);
+PTR ptr(s32 offset);
 
 enum Cond {
 	AE = 0x3,          // above or equal (CF=0)
@@ -44,14 +45,19 @@ enum Cond {
 	AB = 0x7,          // above (CF=0 and ZF=0)
 };
 
-// TODO: cmov, xchg
 void mov(Assembler &a, PTR dst, R src);
 void mov(Assembler &a, R dst, PTR src);
 void mov(Assembler &a, R dst, R src);
 void mov(Assembler &a, R dst, u64 src);
 void mov(Assembler &a, R dst, void *src);
 void mov(Assembler &a, void *dst, R src);
+void cmov(Assembler &a, Cond c, R dst, PTR src);
+void cmov(Assembler &a, Cond c, R dst, R src);
+void xchg(Assembler &a, R dst, PTR src);
+void xchg(Assembler &a, R dst, R src);
 void lea(Assembler &a, R dst, PTR src);
+void inc(Assembler &a, R dst);
+void dec(Assembler &a, R dst);
 void add(Assembler &a, R dst, R src);
 void add(Assembler &a, R dst, u32 src);
 void or_(Assembler &a, R dst, R src);

@@ -12,14 +12,14 @@ struct Symbol {
 };
 
 struct Assembler {
-	Symbol *symtab;
+	Symbol *syms;
 	u8     *b;
 	u32    cap;
 	u32    ip;
 };
 
 void clear(Assembler &a);
-void pushbyte(Assembler &a, u8 b);
-void pushbytes(Assembler &a, u64 v, u8 bytes);
+void push(Assembler &a, u8 b);
+void push(Assembler &a, u64 v, u8 count);
 void label(Assembler &a, const char *name);
-void pushlabeloffset(Assembler &a, const char *name);
+void push_label_offset(Assembler &a, const char *name);

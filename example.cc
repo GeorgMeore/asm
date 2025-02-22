@@ -9,7 +9,7 @@
 
 void *map(Assembler &a)
 {
-	for (Symbol *s = a.symtab; s; s = s->next) {
+	for (Symbol *s = a.syms; s; s = s->next) {
 		if (s->refs) {
 			printf("error: found unresolved references\n");
 			return nullptr;
@@ -25,7 +25,7 @@ void *map(Assembler &a)
 
 void fib(Assembler &a)
 {
-	mov(a, rax, (u64)0);
+	mov(a, rax, 0UL);
 	mov(a, rcx, 1);
 label(a, "loop");
 	cmp(a, rdi, 0);
@@ -33,7 +33,7 @@ label(a, "loop");
 	mov(a, rdx, rcx);
 	add(a, rcx, rax);
 	mov(a, rax, rdx);
-	sub(a, rdi, 1);
+	dec(a, rdi);
 	jmp(a, "loop");
 label(a, "return");
 	ret(a);
@@ -45,7 +45,7 @@ label(a, "sum");
 	cmp(a, rdi, 0);
 	jcc(a, EQ, "return0");
 	push(a, rdi);
-	sub(a, rdi, 1);
+	dec(a, rdi);
 	call(a, "sum");
 	pop(a, rdi);
 	add(a, rax, rdi);
