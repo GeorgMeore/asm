@@ -44,7 +44,7 @@ static void patch(Assembler &a, u32 addr, u64 v, u8 count)
 		a.b[addr+i] = (v & (0xfflu<<(i*8)))>>(i*8);
 }
 
-void push(Assembler &a, u64 v, u8 count)
+void push_bytes(Assembler &a, u64 v, u8 count)
 {
 	if (a.ip + count > a.cap) {
 		a.cap += 4096; // why not
@@ -54,9 +54,9 @@ void push(Assembler &a, u64 v, u8 count)
 	a.ip += count;
 }
 
-void push(Assembler &a, u8 b)
+void push_byte(Assembler &a, u8 b)
 {
-	push(a, b, 1);
+	push_bytes(a, b, 1);
 }
 
 static Symbol *get_sym(Assembler &a, const char *name)
@@ -98,9 +98,9 @@ void push_label_offset(Assembler &a, const char *name)
 	if (!s)
 		s = add_sym(a, name);
 	if (s->resolved) {
-		push(a, s->addr - (a.ip+4), 4);
+		push_bytes(a, s->addr - (a.ip+4), 4);
 	} else {
 		add_ref(s, a.ip);
-		push(a, 0, 4);
+		push_bytes(a, 0, 4);
 	}
 }

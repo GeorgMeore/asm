@@ -19,7 +19,7 @@ struct Assembler {
 };
 
 void clear(Assembler &a);
-void push(Assembler &a, u8 b);
-void push(Assembler &a, u64 v, u8 count);
+void push_byte(Assembler &a, u8 b);
+void push_bytes(Assembler &a, u64 v, u8 count);
 void label(Assembler &a, const char *name);
 void push_label_offset(Assembler &a, const char *name);
