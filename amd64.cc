@@ -157,7 +157,7 @@ static void push_mod_sib_offset(Assembler &a, u8 reg, PTR p)
 	push(a, p.offset, osz);
 }
 
-static void push_r_ptr_pref(Assembler &a, R r, PTR p)
+static void push_prefix(Assembler &a, R r, PTR p)
 {
 	if (size(p) == 32)
 		push(a, 0x67);
@@ -171,14 +171,14 @@ static void push_r_ptr_pref(Assembler &a, R r, PTR p)
 		push(a, rex);
 }
 
-static void r_ptr_inst(Assembler &a, R r, PTR rm, u8 op)
+static void inst(Assembler &a, R r, PTR rm, u8 op)
 {
-	push_r_ptr_pref(a, r, rm);
+	push_prefix(a, r, rm);
 	push(a, op + (size(r) > 8));
 	push_mod_sib_offset(a, code(r), rm);
 }
 
-static void push_r_r_pref(Assembler &a, R r, R rm)
+static void push_prefix(Assembler &a, R r, R rm)
 {
 	if (size(r) == 16)
 		push(a, 0x66);
@@ -190,16 +190,16 @@ static void push_r_r_pref(Assembler &a, R r, R rm)
 		push(a, rex);
 }
 
-static void r_r_inst(Assembler &a, R r, R rm, u8 op)
+static void inst(Assembler &a, R r, R rm, u8 op)
 {
 	if (size(r) != size(rm))
 		panic("register-register operation size mismatch");
-	push_r_r_pref(a, r, rm);
+	push_prefix(a, r, rm);
 	push(a, op + (size(r) > 8));
 	push(a, modrm(ModDirect, code(r), code(rm)));
 }
 
-static void push_r_pref(Assembler &a, R r)
+static void push_prefix(Assembler &a, R r)
 {
 	if (size(r) == 16)
 		push(a, 0x66);
@@ -212,20 +212,20 @@ static void push_r_pref(Assembler &a, R r)
 		push(a, rex);
 }
 
-static void r_inst(Assembler &a, R dst, u8 src, u8 op)
+static void inst(Assembler &a, R dst, u8 src, u8 op)
 {
-	push_r_pref(a, dst);
+	push_prefix(a, dst);
 	push(a, op + (size(dst) > 8));
 	push(a, modrm(ModDirect, src, code(dst)));
 }
 
-void mov(Assembler &a, PTR dst, R src) { r_ptr_inst(a, src, dst, 0x88); }
-void mov(Assembler &a, R dst, PTR src) { r_ptr_inst(a, dst, src, 0x8a); }
-void mov(Assembler &a, R dst, R src) { r_r_inst(a, src, dst, 0x88); }
+void mov(Assembler &a, PTR dst, R src) { inst(a, src, dst, 0x88); }
+void mov(Assembler &a, R dst, PTR src) { inst(a, dst, src, 0x8a); }
+void mov(Assembler &a, R dst, R src) { inst(a, src, dst, 0x88); }
 
 void mov(Assembler &a, R dst, u64 src)
 {
-	push_r_pref(a, dst);
+	push_prefix(a, dst);
 	push(a, size(dst) == 8 ? 0xb0 : 0xb8 + code(dst));
 	push(a, src, size(dst)/8);
 }
@@ -234,7 +234,7 @@ void mov(Assembler &a, R dst, void *src)
 {
 	if (dst.code != A)
 		panic("mov: A register expected");
-	push_r_pref(a, dst);
+	push_prefix(a, dst);
 	push(a, 0xa0 + (size(dst) > 8));
 	push(a, (u64)src, 8);
 }
@@ -243,7 +243,7 @@ void mov(Assembler &a, void *dst, R src)
 {
 	if (src.code != A)
 		panic("mov: A register expected");
-	push_r_pref(a, src);
+	push_prefix(a, src);
 	push(a, 0xa2 + (size(src) > 8));
 	push(a, (u64)dst, 8);
 }
@@ -254,7 +254,7 @@ void cmov(Assembler &a, Cond c, R dst, R src)
 		panic("register-register operation size mismatch");
 	if (size(src) == 8)
 		panic("cmov: cannot use 8-bit registers");
-	push_r_r_pref(a, dst, src);
+	push_prefix(a, dst, src);
 	push(a, 0x0f);
 	push(a, 0x40 + c);
 	push(a, modrm(ModDirect, code(dst), code(src)));
@@ -264,33 +264,30 @@ void cmov(Assembler &a, Cond c, R dst, PTR src)
 {
 	if (size(src) == 8)
 		panic("cmov: cannot use 8-bit registers");
-	push_r_ptr_pref(a, dst, src);
+	push_prefix(a, dst, src);
 	push(a, 0x0f);
 	push(a, 0x40 + c);
 	push_mod_sib_offset(a, code(dst), src);
 }
 
-void xchg(Assembler &a, R dst, PTR src) { r_ptr_inst(a, dst, src, 0x86); }
-void xchg(Assembler &a, R dst, R src) { r_r_inst(a, src, dst, 0x86); }
+void xchg(Assembler &a, R dst, PTR src) { inst(a, dst, src, 0x86); }
+void xchg(Assembler &a, R dst, R src) { inst(a, src, dst, 0x86); }
 
 void lea(Assembler &a, R dst, PTR src)
 {
 	if (size(dst) == 8)
 		panic("lea: cannot use 8 bit dst");
-	r_ptr_inst(a, dst, src, 0x8c);
+	inst(a, dst, src, 0x8c);
 }
 
-void inc(Assembler &a, R dst) { r_inst(a, dst, 0b000, 0xfe); }
-void dec(Assembler &a, R dst) { r_inst(a, dst, 0b001, 0xfe); }
+void inc(Assembler &a, R dst) { inst(a, dst, 0b000, 0xfe); }
+void dec(Assembler &a, R dst) { inst(a, dst, 0b001, 0xfe); }
 
-static void arith(Assembler &a, R dst, R src, u8 op)
-{
-	r_r_inst(a, src, dst, (op << 3));
-}
+static void arith(Assembler &a, R dst, R src, u8 op) { inst(a, src, dst, (op << 3)); }
 
 static void arith(Assembler &a, R dst, u32 src, u8 op)
 {
-	push_r_pref(a, dst);
+	push_prefix(a, dst);
 	if (dst.code == A) {
 		push(a, 0x05);
 	} else {
