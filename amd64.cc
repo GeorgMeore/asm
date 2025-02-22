@@ -283,8 +283,6 @@ void lea(Assembler &a, R dst, PTR src)
 void inc(Assembler &a, R dst) { inst(a, dst, 0b000, 0xfe); }
 void dec(Assembler &a, R dst) { inst(a, dst, 0b001, 0xfe); }
 
-static void arith(Assembler &a, R dst, R src, u8 op) { inst(a, src, dst, (op << 3)); }
-
 static void arith(Assembler &a, R dst, u32 src, u8 op)
 {
 	push_prefix(a, dst);
@@ -300,17 +298,17 @@ static void arith(Assembler &a, R dst, u32 src, u8 op)
 		push(a, src, size(dst)/8);
 }
 
-void add(Assembler &a, R dst, R src) { arith(a, dst, src, 0b000); }
+void add(Assembler &a, R dst, R src) { inst(a, src, dst, 0b000 << 3); }
 void add(Assembler &a, R dst, u32 src) { arith(a, dst, src, 0b000); }
-void or_(Assembler &a, R dst, R src) { arith(a, dst, src, 0b001); }
+void or_(Assembler &a, R dst, R src) { inst(a, src, dst, 0b001 << 3); }
 void or_(Assembler &a, R dst, u32 src) { arith(a, dst, src, 0b001); }
-void and_(Assembler &a, R dst, R src) { arith(a, dst, src, 0b100); }
+void and_(Assembler &a, R dst, R src) { inst(a, src, dst, 0b100 << 3); }
 void and_(Assembler &a, R dst, u32 src) { arith(a, dst, src, 0b100); }
-void sub(Assembler &a, R dst, R src) { arith(a, dst, src, 0b101); }
+void sub(Assembler &a, R dst, R src) { inst(a, src, dst, 0b101 << 3); }
 void sub(Assembler &a, R dst, u32 src) { arith(a, dst, src, 0b101); }
-void xor_(Assembler &a, R dst, R src) { arith(a, dst, src, 0b110); }
+void xor_(Assembler &a, R dst, R src) { inst(a, src, dst, 0b110 << 3); }
 void xor_(Assembler &a, R dst, u32 src) { arith(a, dst, src, 0b110); }
-void cmp(Assembler &a, R dst, R src) { arith(a, dst, src, 0b111); }
+void cmp(Assembler &a, R dst, R src) { inst(a, src, dst, 0b111 << 3); }
 void cmp(Assembler &a, R dst, u32 src) { arith(a, dst, src, 0b111); }
 
 void jcc(Assembler &a, Cond c, const char *l)
