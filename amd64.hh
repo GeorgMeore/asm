@@ -3,6 +3,23 @@ struct R {
 	u8 size;
 };
 
+extern const R rax, eax,  ax,   al;
+extern const R rcx, ecx,  cx,   cl;
+extern const R rdx, edx,  dx,   dl;
+extern const R rbx, ebx,  bx,   bl;
+extern const R rsp, esp,  sp,   spl;
+extern const R rbp, ebp,  bp,   bpl;
+extern const R rsi, esi,  si,   sil;
+extern const R rdi, edi,  di,   dil;
+extern const R r8,  r8d,  r8w,  r8b;
+extern const R r9,  r9d,  r9w,  r9b;
+extern const R r10, r10d, r10w, r10b;
+extern const R r11, r11d, r11w, r11b;
+extern const R r12, r12d, r12w, r12b;
+extern const R r13, r13d, r13w, r13b;
+extern const R r14, r14d, r14w, r14b;
+extern const R r15, r15d, r15w, r15b;
+
 struct I {
 	R  index;
 	u8 scale;
@@ -20,23 +37,6 @@ struct PTR {
 PTR ptr(R base, I i, s32 offset = 0);
 PTR ptr(R base, s32 offset = 0);
 PTR ptr(I i, s32 offset = 0);
-
-extern const R rax, eax,  ax,   al;
-extern const R rcx, ecx,  cx,   cl;
-extern const R rdx, edx,  dx,   dl;
-extern const R rbx, ebx,  bx,   bl;
-extern const R rsp, esp,  sp,   spl;
-extern const R rbp, ebp,  bp,   bpl;
-extern const R rsi, esi,  si,   sil;
-extern const R rdi, edi,  di,   dil;
-extern const R r8,  r8d,  r8w,  r8b;
-extern const R r9,  r9d,  r9w,  r9b;
-extern const R r10, r10d, r10w, r10b;
-extern const R r11, r11d, r11w, r11b;
-extern const R r12, r12d, r12w, r12b;
-extern const R r13, r13d, r13w, r13b;
-extern const R r14, r14d, r14w, r14b;
-extern const R r15, r15d, r15w, r15b;
 
 enum Cond {
 	AE = 0x3,          // above or equal (CF=0)
