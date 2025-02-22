@@ -157,7 +157,7 @@ static void push_mod_sib_offset(Assembler &a, u8 reg, PTR p)
 	push_bytes(a, p.offset, osz);
 }
 
-static void push_prefix(Assembler &a, R r, PTR p)
+static void push_prefixes(Assembler &a, R r, PTR p)
 {
 	if (size(p) == 32)
 		push_byte(a, 0x67);
@@ -173,12 +173,12 @@ static void push_prefix(Assembler &a, R r, PTR p)
 
 static void inst(Assembler &a, R r, PTR rm, u8 op)
 {
-	push_prefix(a, r, rm);
+	push_prefixes(a, r, rm);
 	push_byte(a, op + (size(r) > 8));
 	push_mod_sib_offset(a, code(r), rm);
 }
 
-static void push_prefix(Assembler &a, R r, R rm)
+static void push_prefixes(Assembler &a, R r, R rm)
 {
 	if (size(r) == 16)
 		push_byte(a, 0x66);
@@ -194,12 +194,12 @@ static void inst(Assembler &a, R r, R rm, u8 op)
 {
 	if (size(r) != size(rm))
 		panic("register-register operation size mismatch");
-	push_prefix(a, r, rm);
+	push_prefixes(a, r, rm);
 	push_byte(a, op + (size(r) > 8));
 	push_byte(a, modrm(ModDirect, code(r), code(rm)));
 }
 
-static void push_prefix(Assembler &a, R r)
+static void push_prefixes(Assembler &a, R r)
 {
 	if (size(r) == 16)
 		push_byte(a, 0x66);
@@ -214,7 +214,7 @@ static void push_prefix(Assembler &a, R r)
 
 static void inst(Assembler &a, R dst, u8 src, u8 op)
 {
-	push_prefix(a, dst);
+	push_prefixes(a, dst);
 	push_byte(a, op + (size(dst) > 8));
 	push_byte(a, modrm(ModDirect, src, code(dst)));
 }
@@ -225,7 +225,7 @@ void mov(Assembler &a, R dst, R src) { inst(a, src, dst, 0x88); }
 
 void mov(Assembler &a, R dst, u64 src)
 {
-	push_prefix(a, dst);
+	push_prefixes(a, dst);
 	push_byte(a, size(dst) == 8 ? 0xb0 : 0xb8 + code(dst));
 	push_bytes(a, src, size(dst)/8);
 }
@@ -234,7 +234,7 @@ void mov(Assembler &a, R dst, void *src)
 {
 	if (dst.code != A)
 		panic("mov: A register expected");
-	push_prefix(a, dst);
+	push_prefixes(a, dst);
 	push_byte(a, 0xa0 + (size(dst) > 8));
 	push_bytes(a, (u64)src, 8);
 }
@@ -243,7 +243,7 @@ void mov(Assembler &a, void *dst, R src)
 {
 	if (src.code != A)
 		panic("mov: A register expected");
-	push_prefix(a, src);
+	push_prefixes(a, src);
 	push_byte(a, 0xa2 + (size(src) > 8));
 	push_bytes(a, (u64)dst, 8);
 }
@@ -254,7 +254,7 @@ void cmov(Assembler &a, Cond c, R dst, R src)
 		panic("register-register operation size mismatch");
 	if (size(src) == 8)
 		panic("cmov: cannot use 8-bit registers");
-	push_prefix(a, dst, src);
+	push_prefixes(a, dst, src);
 	push_byte(a, 0x0f);
 	push_byte(a, 0x40 + c);
 	push_byte(a, modrm(ModDirect, code(dst), code(src)));
@@ -264,7 +264,7 @@ void cmov(Assembler &a, Cond c, R dst, PTR src)
 {
 	if (size(src) == 8)
 		panic("cmov: cannot use 8-bit registers");
-	push_prefix(a, dst, src);
+	push_prefixes(a, dst, src);
 	push_byte(a, 0x0f);
 	push_byte(a, 0x40 + c);
 	push_mod_sib_offset(a, code(dst), src);
@@ -285,7 +285,7 @@ void dec(Assembler &a, R dst) { inst(a, dst, 0b001, 0xfe); }
 
 static void arith(Assembler &a, R dst, u32 src, u8 op)
 {
-	push_prefix(a, dst);
+	push_prefixes(a, dst);
 	if (dst.code == A) {
 		push_byte(a, 0x05);
 	} else {
