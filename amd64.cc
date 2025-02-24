@@ -97,8 +97,8 @@ static Mod mod(u8 offsetsize)
 		case 0: return ModDisp0;
 		case 1: return ModDisp1;
 		case 4: return ModDisp4;
+		default: assert(0);
 	}
-	assert(0);
 }
 
 static u8 modrm(Mod mod, u8 reg, u8 rm) { return mod<<6 | reg<<3 | rm; }
@@ -117,8 +117,8 @@ static Scale scale(u8 scale)
 		case 2: return Scale2;
 		case 4: return Scale4;
 		case 8: return Scale8;
+		default: assert(0);
 	}
-	assert(0);
 }
 
 static u8 sib(Scale scale, u8 index, u8 base)
