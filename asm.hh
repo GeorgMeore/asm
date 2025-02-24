@@ -11,11 +11,16 @@ struct Symbol {
 	int        resolved;
 };
 
+enum AsmError {
+	AsmErrDupLabel,
+};
+
 struct Assembler {
 	Symbol *syms;
 	u8     *b;
 	u32    cap;
 	u32    ip;
+	int    err;
 };
 
 void clear(Assembler &a);

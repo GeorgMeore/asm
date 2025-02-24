@@ -1,15 +1,8 @@
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include "types.hh"
 #include "asm.hh"
-
-static void panic(const char *msg)
-{
-	fprintf(stderr, "Assembler error: %s\n", msg);
-	exit(1);
-}
 
 static Symbol *sym(const char *name)
 {
@@ -81,7 +74,7 @@ void label(Assembler &a, const char *name)
 	if (!s)
 		s = add_sym(a, name);
 	if (s->resolved)
-		panic("label already defined");
+		a.err = AsmErrDupLabel;
 	s->resolved = 1;
 	s->addr = a.ip;
 	while (s->refs) {

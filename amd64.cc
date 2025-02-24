@@ -1,15 +1,8 @@
-#include <stdio.h>
-#include <stdlib.h>
+#include <assert.h>
 
 #include "types.hh"
 #include "asm.hh"
 #include "amd64.hh"
-
-static void panic(const char *msg)
-{
-	fprintf(stderr, "panic: Instruction error: %s\n", msg);
-	exit(1);
-}
 
 enum RCode {
 	A   = 0b0000,
@@ -51,14 +44,7 @@ static u8   size(R r) { return r.size; }
 static u8   code(R r) { return r.code & 0b111; }
 static bool isnew(R r) { return r.code & 0b1000; }
 
-I operator*(R r, u8 scale)
-{
-	if (scale < 1 || scale > 8 || scale&(scale - 1))
-		panic("invalid index/base expression: scale must be 1,2,4 or 8");
-	if (r.code == SP)
-		panic("invalid index/base expression: cannot use RSP as an index");
-	return {r, scale};
-}
+I operator*(R r, u8 scale) { return {r, scale}; }
 
 static u8 offsetsize(PTR p)
 {
@@ -71,18 +57,25 @@ static u8 offsetsize(PTR p)
 
 static u8 size(PTR p) { return p.base.code ? p.base.size : p.index.size; }
 
-PTR ptr(R base, I i, s32 offset)
-{
-	if ((size(base) && size(base) < 32) || (size(i.index) && size(i.index) < 32))
-		panic("invalid index/base expression: cannot use 8 or 16 bit registers");
-	if (size(base) && size(i.index) && size(base) != size(i.index))
-		panic("invalid index/base expression: size mismatch");
-	return {offset, base, i.index, i.scale};
-}
-
+PTR ptr(R base, I i, s32 offset) { return {offset, base, i.index, i.scale}; }
 PTR ptr(R base, s32 offset) { return ptr(base, {}, offset); }
 PTR ptr(I i, s32 offset) { return ptr({}, i, offset); }
 PTR ptr(s32 offset) { return ptr({}, {}, offset); }
+
+static int ptr_err(PTR p)
+{
+	if (size(p.index) & 0x1f || size(p.base) & 0x1f)
+		return Amd64ErrSize; // less than 32 bits
+	if (size(p.index)) {
+		if (!p.scale || p.scale > 8 || p.scale&(p.scale - 1))
+			return Amd64ErrScale;
+		if (p.index.code == SP)
+			return Amd64ErrReg;
+		if (size(p.base) && size(p.base) != size(p.index))
+			return Amd64ErrSize;
+	}
+	return 0;
+}
 
 enum REX {
 	REXW = 0b01001000,
@@ -103,9 +96,9 @@ static Mod mod(u8 offsetsize)
 	switch (offsetsize) {
 		case 0: return ModDisp0;
 		case 1: return ModDisp1;
-		default: panic("invalid offset size"); // fallthrough
 		case 4: return ModDisp4;
 	}
+	assert(0);
 }
 
 static u8 modrm(Mod mod, u8 reg, u8 rm) { return mod<<6 | reg<<3 | rm; }
@@ -123,9 +116,9 @@ static Scale scale(u8 scale)
 		case 1: return Scale1;
 		case 2: return Scale2;
 		case 4: return Scale4;
-		default: panic("invalid scale"); // fallthrough
 		case 8: return Scale8;
 	}
+	assert(0);
 }
 
 static u8 sib(Scale scale, u8 index, u8 base)
@@ -173,6 +166,10 @@ static void push_prefixes(Assembler &a, R r, PTR p)
 
 static void inst(Assembler &a, R r, PTR rm, u8 op)
 {
+	if (!a.err)
+		a.err = ptr_err(rm);
+	if (a.err)
+		return ud2(a);
 	push_prefixes(a, r, rm);
 	push_byte(a, op + (size(r) > 8));
 	push_mod_sib_offset(a, code(r), rm);
@@ -192,8 +189,10 @@ static void push_prefixes(Assembler &a, R r, R rm)
 
 static void inst(Assembler &a, R r, R rm, u8 op)
 {
-	if (size(r) != size(rm))
-		panic("register-register operation size mismatch");
+	if (size(r) != size(rm)) {
+		a.err = Amd64ErrSize;
+		return ud2(a);
+	}
 	push_prefixes(a, r, rm);
 	push_byte(a, op + (size(r) > 8));
 	push_byte(a, modrm(ModDirect, code(r), code(rm)));
@@ -232,8 +231,10 @@ void mov(Assembler &a, R dst, u64 src)
 
 void mov(Assembler &a, R dst, void *src)
 {
-	if (dst.code != A)
-		panic("mov: A register expected");
+	if (dst.code != A) {
+		a.err = Amd64ErrReg;
+		return ud2(a);
+	}
 	push_prefixes(a, dst);
 	push_byte(a, 0xa0 + (size(dst) > 8));
 	push_bytes(a, (u64)src, 8);
@@ -241,8 +242,10 @@ void mov(Assembler &a, R dst, void *src)
 
 void mov(Assembler &a, void *dst, R src)
 {
-	if (src.code != A)
-		panic("mov: A register expected");
+	if (src.code != A) {
+		a.err = Amd64ErrReg;
+		return ud2(a);
+	}
 	push_prefixes(a, src);
 	push_byte(a, 0xa2 + (size(src) > 8));
 	push_bytes(a, (u64)dst, 8);
@@ -250,10 +253,10 @@ void mov(Assembler &a, void *dst, R src)
 
 void cmov(Assembler &a, Cond c, R dst, R src)
 {
-	if (size(src) != size(dst))
-		panic("register-register operation size mismatch");
-	if (size(src) == 8)
-		panic("cmov: cannot use 8-bit registers");
+	if (size(src) != size(dst) || size(src) == 8) {
+		a.err = Amd64ErrSize;
+		return ud2(a);
+	}
 	push_prefixes(a, dst, src);
 	push_byte(a, 0x0f);
 	push_byte(a, 0x40 + c);
@@ -262,8 +265,12 @@ void cmov(Assembler &a, Cond c, R dst, R src)
 
 void cmov(Assembler &a, Cond c, R dst, PTR src)
 {
+	if (!a.err)
+		a.err = ptr_err(src);
 	if (size(src) == 8)
-		panic("cmov: cannot use 8-bit registers");
+		a.err = Amd64ErrSize;
+	if (a.err)
+		return ud2(a);
 	push_prefixes(a, dst, src);
 	push_byte(a, 0x0f);
 	push_byte(a, 0x40 + c);
@@ -275,8 +282,10 @@ void xchg(Assembler &a, R dst, R src) { inst(a, src, dst, 0x86); }
 
 void lea(Assembler &a, R dst, PTR src)
 {
-	if (size(dst) == 8)
-		panic("lea: cannot use 8 bit dst");
+	if (size(dst) == 8) {
+		a.err = Amd64ErrSize;
+		return ud2(a);
+	}
 	inst(a, dst, src, 0x8c);
 }
 
@@ -326,6 +335,10 @@ static void jump(Assembler &a, const char *dst, u8 op)
 
 static void jump(Assembler &a, PTR dst, u8 op)
 {
+	if (!a.err)
+		a.err = ptr_err(dst);
+	if (a.err)
+		return ud2(a);
 	if (size(dst) == 32)
 		push_byte(a, 0x67);
 	u8 rex = isnew(dst.index)*REXX | isnew(dst.base)*REXB;
@@ -337,8 +350,10 @@ static void jump(Assembler &a, PTR dst, u8 op)
 
 static void jump(Assembler &a, R dst, u8 op)
 {
-	if (size(dst) != 64)
-		panic("jump: not a 64 bit register");
+	if (size(dst) != 64) {
+		a.err = Amd64ErrSize;
+		return ud2(a);
+	}
 	if (isnew(dst))
 		push_byte(a, REXB);
 	push_byte(a, 0xff);
@@ -354,8 +369,10 @@ void call(Assembler &a, R dst) { jump(a, dst, 0b010); }
 
 void push(Assembler &a, R dst)
 {
-	if (size(dst) != 64)
-		panic("push: not a 64 bit register");
+	if (size(dst) != 64) {
+		a.err = Amd64ErrSize;
+		return ud2(a);
+	}
 	if (isnew(dst))
 		push_byte(a, REXB);
 	push_byte(a, 0x50 + code(dst));
@@ -363,11 +380,19 @@ void push(Assembler &a, R dst)
 
 void pop(Assembler &a, R dst)
 {
-	if (size(dst) != 64)
-		panic("pop: not a 64 bit register");
+	if (size(dst) != 64) {
+		a.err = Amd64ErrSize;
+		return ud2(a);
+	}
 	if (isnew(dst))
 		push_byte(a, REXB);
 	push_byte(a, 0x58 + code(dst));
 }
 
 void ret(Assembler &a) { push_byte(a, 0xc3); }
+
+void ud2(Assembler &a)
+{
+	push_byte(a, 0x0f);
+	push_byte(a, 0x0b);
+}

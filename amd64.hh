@@ -20,6 +20,12 @@ extern const R r13, r13d, r13w, r13b;
 extern const R r14, r14d, r14w, r14b;
 extern const R r15, r15d, r15w, r15b;
 
+enum Amd64Error {
+	Amd64ErrScale,
+	Amd64ErrReg,
+	Amd64ErrSize,
+};
+
 struct I {
 	R  index;
 	u8 scale;
@@ -80,3 +86,4 @@ void call(Assembler &a, R dst);
 void push(Assembler &a, R dst);
 void pop(Assembler &a, R dst);
 void ret(Assembler &a);
+void ud2(Assembler &a);
