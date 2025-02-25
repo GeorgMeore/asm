@@ -8,7 +8,7 @@
 #include "asm.hh"
 #include "amd64.hh"
 
-void *map(Assembler &a)
+void *link(Assembler &a)
 {
 	for (Symbol *s = a.syms; s; s = s->next) {
 		if (s->refs) {
@@ -16,12 +16,8 @@ void *map(Assembler &a)
 			return 0;
 		}
 	}
-	void *p = mmap(0, a.ip, PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
-	if (p) {
-		memcpy(p, a.code, a.ip);
-		mprotect(p, a.ip, PROT_READ|PROT_EXEC);
-	}
-	return p;
+	mprotect(a.code, a.ip, PROT_READ|PROT_EXEC);
+	return a.code;
 }
 
 void fib(Assembler &a)
@@ -60,14 +56,14 @@ int main(void)
 {
 	Assembler a{};
 	fib(a);
-	u64 (*fibp)(u64) = (u64(*)(u64))map(a);
-	clear(a);
-	sum(a);
-	u64 (*sump)(u64) = (u64(*)(u64))map(a);
-	clear(a);
+	u64 (*fibp)(u64) = (u64(*)(u64))link(a);
 	for (u64 i = 0; i <= 10; i++)
 		printf("fib(%lu) = %lu\n", i, fibp(i));
+	clear(a);
+	sum(a);
+	u64 (*sump)(u64) = (u64(*)(u64))link(a);
 	for (u64 i = 0; i <= 10; i++)
 		printf("sum(%lu) = %lu\n", i, sump(i));
+	clear(a);
 	return 0;
 }
