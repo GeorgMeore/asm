@@ -2,13 +2,14 @@
 #include <stdlib.h>
 
 #include "types.hh"
+#include "arena.hh"
 #include "asm.hh"
 #include "amd64.hh"
 
 void expect(const Assembler &a, const u8 b[], u64 s, const char *file, int line)
 {
 	for (u8 i = 0; i < s; i++) {
-		if (a.ip < i || a.b[a.ip-1-i] != b[s-1-i]) {
+		if (a.ip < i || a.code[a.ip-1-i] != b[s-1-i]) {
 			printf("Test failed: %s:%d\n", file, line);
 			exit(1);
 		}

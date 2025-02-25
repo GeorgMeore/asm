@@ -1,47 +1,33 @@
-#include <stdlib.h>
+#include <sys/mman.h>
 #include <string.h>
 
 #include "types.hh"
+#include "arena.hh"
 #include "asm.hh"
 
-static Symbol *sym(const char *name)
-{
-	Symbol *s = (Symbol *)malloc(sizeof(*s));
-	memset(s, 0, sizeof(*s));
-	s->name = name;
-	return s;
-}
-
-static void add_ref(Symbol *s, u32 addr)
-{
-	Ref *r = (Ref *)malloc(sizeof(*r));
-	r->next = s->refs;
-	r->addr = addr;
-	s->refs = r;
-}
+// We just reserve 4GiB of space upfront
+static const u64 CodeSize = 4*((u64)1 << 30);
 
 void clear(Assembler &a)
 {
-	while (a.syms) {
-		Symbol *s = a.syms;
-		a.syms = s->next;
-		free(s);
-	}
-	free(a.b);
+	reset(a.tmp);
+	munmap(a.code, CodeSize);
 	a = {};
 }
 
 static void patch(Assembler &a, u32 addr, u64 v, u8 count)
 {
 	for (u32 i = 0; i < count; i++)
-		a.b[addr+i] = (v & (0xfflu<<(i*8)))>>(i*8);
+		a.code[addr+i] = (v & (0xfflu<<(i*8)))>>(i*8);
 }
 
 void push_bytes(Assembler &a, u64 v, u8 count)
 {
-	if (a.ip + count > a.cap) {
-		a.cap += 4096; // why not
-		a.b = (u8 *)realloc(a.b, a.cap);
+	if (!a.code)
+		a.code = (u8 *)mmap(0, CodeSize, PROT_READ|PROT_WRITE, MAP_ANONYMOUS|MAP_PRIVATE|MAP_NORESERVE, -1, 0);
+	if (a.ip + count < a.ip) {
+		a.err = AsmErrOverflow;
+		return;
 	}
 	patch(a, a.ip, v, count);
 	a.ip += count;
@@ -62,10 +48,17 @@ static Symbol *get_sym(Assembler &a, const char *name)
 
 static Symbol *add_sym(Assembler &a, const char *name)
 {
-	Symbol *s = sym(name);
-	s->next = a.syms;
+	Symbol *s = (Symbol *)alloc(a.tmp, sizeof(Symbol));
+	*s = {a.syms, 0, name, 0, 0};
 	a.syms = s;
 	return s;
+}
+
+static void add_ref(Assembler &a, Symbol *s)
+{
+	Ref *r = (Ref *)alloc(a.tmp, sizeof(Ref));
+	*r = {s->refs, a.ip};
+	s->refs = r;
 }
 
 void label(Assembler &a, const char *name)
@@ -77,12 +70,9 @@ void label(Assembler &a, const char *name)
 		a.err = AsmErrDupLabel;
 	s->resolved = 1;
 	s->addr = a.ip;
-	while (s->refs) {
-		Ref *r = s->refs;
-		s->refs = r->next;
+	for (Ref *r = s->refs; r; r = r->next)
 		patch(a, r->addr, s->addr - (r->addr+4), 4);
-		free(r);
-	}
+	s->refs = 0;
 }
 
 void push_label_offset(Assembler &a, const char *name)
@@ -93,7 +83,7 @@ void push_label_offset(Assembler &a, const char *name)
 	if (s->resolved) {
 		push_bytes(a, s->addr - (a.ip+4), 4);
 	} else {
-		add_ref(s, a.ip);
+		add_ref(a, s);
 		push_bytes(a, 0, 4);
 	}
 }

@@ -13,12 +13,13 @@ struct Symbol {
 
 enum AsmError {
 	AsmErrDupLabel,
+	AsmErrOverflow,
 };
 
 struct Assembler {
+	Arena  tmp;
 	Symbol *syms;
-	u8     *b;
-	u32    cap;
+	u8     *code;
 	u32    ip;
 	int    err;
 };

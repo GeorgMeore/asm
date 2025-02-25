@@ -4,6 +4,7 @@
 #include <sys/mman.h>
 
 #include "types.hh"
+#include "arena.hh"
 #include "asm.hh"
 #include "amd64.hh"
 
@@ -12,12 +13,12 @@ void *map(Assembler &a)
 	for (Symbol *s = a.syms; s; s = s->next) {
 		if (s->refs) {
 			printf("error: found unresolved references\n");
-			return nullptr;
+			return 0;
 		}
 	}
 	void *p = mmap(0, a.ip, PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
 	if (p) {
-		memcpy(p, a.b, a.ip);
+		memcpy(p, a.code, a.ip);
 		mprotect(p, a.ip, PROT_READ|PROT_EXEC);
 	}
 	return p;

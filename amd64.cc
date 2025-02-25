@@ -1,6 +1,7 @@
 #include <assert.h>
 
 #include "types.hh"
+#include "arena.hh"
 #include "asm.hh"
 #include "amd64.hh"
 
