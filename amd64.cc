@@ -399,3 +399,9 @@ void ud2(Assembler &a)
 }
 
 void int3(Assembler &a) { push_byte(a, 0xcc); }
+
+void syscall(Assembler &a)
+{
+	push_byte(a, 0x0f);
+	push_byte(a, 0x05);
+}

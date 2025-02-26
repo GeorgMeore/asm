@@ -88,3 +88,4 @@ void pop(Assembler &a, R dst);
 void ret(Assembler &a);
 void ud2(Assembler &a);
 void int3(Assembler &a);
+void syscall(Assembler &a);

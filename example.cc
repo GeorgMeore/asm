@@ -1,6 +1,4 @@
 #include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #include <sys/mman.h>
 
 #include "types.hh"
@@ -56,9 +54,23 @@ label(a, "return0");
 	ret(a);
 }
 
+void hello(Assembler &a)
+{
+	mov(a, rax, 1);
+	mov(a, rdi, (u64)0);
+	mov(a, rsi, (u64)"Hello, world!\n");
+	mov(a, rdx, 14);
+	syscall(a);
+	ret(a);
+}
+
 int main(void)
 {
 	Assembler a{};
+	hello(a);
+	void (*hellop)() = (void(*)())link(a);
+	hellop();
+	clear(a);
 	fib(a);
 	u64 (*fibp)(u64) = (u64(*)(u64))link(a);
 	for (u64 i = 0; i <= 10; i++)
