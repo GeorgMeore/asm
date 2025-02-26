@@ -10,6 +10,10 @@
 
 void *link(Assembler &a)
 {
+	if (a.err) {
+		printf("error: assembly error: %d\n", a.err);
+		return 0;
+	}
 	for (Symbol *s = a.syms; s; s = s->next) {
 		if (s->refs) {
 			printf("error: found unresolved references\n");

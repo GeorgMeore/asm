@@ -8,7 +8,7 @@ static const u32 PageSize = 16*((u32)1 << 20);
 
 static u32 free(Page *p)
 {
-	return p ? (u64)p->data - (u64)p : 0;
+	return p ? PageSize - ((u64)p->data - (u64)p) : 0;
 }
 
 void *alloc(Arena &a, u32 size, u16 align)
