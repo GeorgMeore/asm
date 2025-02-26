@@ -7,6 +7,16 @@
 
 void dump(Assembler &a)
 {
+	if (a.err) {
+		printf("error: assembly error: %d\n", a.err);
+		return;
+	}
+	for (Symbol *s = a.syms; s; s = s->next) {
+		if (s->refs) {
+			printf("error: found unresolved references\n");
+			return;
+		}
+	}
 	for (u32 i = 0; i < a.ip; i++)
 		putchar(a.code[i]);
 }
