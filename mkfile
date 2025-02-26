@@ -1,10 +1,10 @@
 CXXFLAGS=-g -fsanitize=address,undefined -Wall -Wextra
 
-all:V: test example
+all:V: test examples/fib examples/link
 	./test # run tests
 
-example: example.cc arena.o asm.o amd64.o
-	c++ $CXXFLAGS -o $target $prereq
+examples/%: examples/%.cc arena.o asm.o amd64.o
+	c++ -I . $CXXFLAGS -o $target $prereq
 
 test: test.cc arena.o asm.o amd64.o
 	c++ $CXXFLAGS -o $target $prereq

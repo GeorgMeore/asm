@@ -22,22 +22,6 @@ void *link(Assembler &a)
 	return a.code;
 }
 
-void fib(Assembler &a)
-{
-	mov(a, rax, 0UL);
-	mov(a, rcx, 1);
-label(a, "loop");
-	cmp(a, rdi, 0);
-	jcc(a, EQ, "return");
-	mov(a, rdx, rcx);
-	add(a, rcx, rax);
-	mov(a, rax, rdx);
-	dec(a, rdi);
-	jmp(a, "loop");
-label(a, "return");
-	ret(a);
-}
-
 void sum(Assembler &a)
 {
 label(a, "sum");
@@ -64,17 +48,13 @@ void hello(Assembler &a)
 	ret(a);
 }
 
+// We can do dynamic code generation!
 int main(void)
 {
 	Assembler a{};
 	hello(a);
 	void (*hellop)() = (void(*)())link(a);
 	hellop();
-	clear(a);
-	fib(a);
-	u64 (*fibp)(u64) = (u64(*)(u64))link(a);
-	for (u64 i = 0; i <= 10; i++)
-		printf("fib(%lu) = %lu\n", i, fibp(i));
 	clear(a);
 	sum(a);
 	u64 (*sump)(u64) = (u64(*)(u64))link(a);
