@@ -46,9 +46,22 @@ PTR ptr(I i, s32 offset = 0);
 PTR ptr(s32 offset);
 
 enum Cond {
-	AE = 0x3,          // above or equal (CF=0)
-	Z = 0x4, EQ = 0x4, // equal (ZF=1)
-	AB = 0x7,          // above (CF=0 and ZF=0)
+	CondO = 0x0,                              // overflow (OF=1)
+	CondNO = 0x1,                             // not overflow (OF=0)
+	CondB = 0x2, CondC = 0x2, CondNAE = 0x2,  // below/carry/not above or equal (CF=1)
+	CondAE = 0x3, CondNB = 0x3, CondNC = 0x3, // above or equal/not below/not carry (CF=0)
+	CondZ = 0x4, CondE = 0x4,                 // zero/equal (ZF=1)
+	CondNE = 0x5, CondNZ = 0x5,               // not equal/not zero (ZF=0)
+	CondBE = 0x6, CondNA = 0x6,               // below or equal/not above (CF=1 or ZF=1)
+	CondA = 0x7, CondNBE = 0x7,               // above/not below or equal (CF=0 and ZF=0)
+	CondS = 0x8,                              // sign (SF=1)
+	CondNS = 0x9,                             // not sign (SF=0)
+	CondP = 0xa, CondPE = 0xa,                // parity/parity even (PF=1)
+	CondNP = 0xb, CondPO = 0xb,               // not parity/parity odd (PF=0)
+	CondL = 0xc, CondNGE = 0xc,               // less/not greater or equal (SF!=OF)
+	CondGE = 0xd, CondNL = 0xd,               // greater or equal/not less (SF=OF)
+	CondLE = 0xe, CondNG = 0xe,               // less or equal/not greater (ZF=1 or SF!=OF)
+	CondG = 0xf, CondNLE = 0xf,               // greater/not less or equal (ZF=0 and SF=OF)
 };
 
 void mov(Assembler &a, PTR dst, R src);

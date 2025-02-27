@@ -28,7 +28,7 @@ label(a, "fib");
 	mov(a, rcx, 1);
 label(a, "loop");
 	cmp(a, rdi, 0);
-	jcc(a, EQ, "return");
+	jcc(a, CondE, "return");
 	mov(a, rdx, rcx);
 	add(a, rcx, rax);
 	mov(a, rax, rdx);

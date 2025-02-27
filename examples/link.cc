@@ -26,7 +26,7 @@ void sum(Assembler &a)
 {
 label(a, "sum");
 	cmp(a, rdi, 0);
-	jcc(a, EQ, "return0");
+	jcc(a, CondE, "return0");
 	push(a, rdi);
 	dec(a, rdi);
 	call(a, "sum");
