@@ -321,6 +321,9 @@ void xor_(Assembler &a, R dst, u32 src) { arith(a, dst, src, 0b110); }
 void cmp(Assembler &a, R dst, R src) { inst(a, src, dst, 0b111 << 3); }
 void cmp(Assembler &a, R dst, u32 src) { arith(a, dst, src, 0b111); }
 
+void mul(Assembler &a, R src) { inst(a, src, 0x4, 0xf6); }
+void div(Assembler &a, R src) { inst(a, src, 0x6, 0xf6); }
+
 void jcc(Assembler &a, Cond c, const char *l)
 {
 	push_byte(a, 0x0f);
@@ -404,4 +407,13 @@ void syscall(Assembler &a)
 {
 	push_byte(a, 0x0f);
 	push_byte(a, 0x05);
+}
+
+void nop(Assembler &a) { push_byte(a, 0x90); }
+
+void mfence(Assembler &a)
+{
+	push_byte(a, 0x0f);
+	push_byte(a, 0xae);
+	push_byte(a, 0xf0);
 }

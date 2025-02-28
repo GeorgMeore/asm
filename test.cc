@@ -99,6 +99,18 @@ label(a, "foo");
 	xchg(a, al, ptr(esp, ebp*2, 127));  expect(a, {0x67, 0x86, 0x44, 0x6c, 0x7f});
 	xchg(a, r10b, ptr(r8, r9*2, 128));  expect(a, {0x47, 0x86, 0x94, 0x48, 0x80, 0x00, 0x00, 0x00});
 	int3(a);                            expect(a, {0xcc});
+	mul(a, bl);                         expect(a, {0xf6, 0xe3});
+	mul(a, bx);                         expect(a, {0x66, 0xf7, 0xe3});
+	mul(a, ebx);                        expect(a, {0xf7, 0xe3});
+	mul(a, rbx);                        expect(a, {0x48, 0xf7, 0xe3});
+	mul(a, r9);                         expect(a, {0x49, 0xf7, 0xe1});
+	div(a, bl);                         expect(a, {0xf6, 0xf3});
+	div(a, bx);                         expect(a, {0x66, 0xf7, 0xf3});
+	div(a, ebx);                        expect(a, {0xf7, 0xf3});
+	div(a, rbx);                        expect(a, {0x48, 0xf7, 0xf3});
+	div(a, r9);                         expect(a, {0x49, 0xf7, 0xf1});
+	nop(a);                             expect(a, {0x90});
+	mfence(a);                          expect(a, {0x0f, 0xae, 0xf0});
 	printf("OK\n");
 	clear(a);
 }
