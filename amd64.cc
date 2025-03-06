@@ -394,26 +394,9 @@ void pop(Assembler &a, R dst)
 }
 
 void ret(Assembler &a) { push_byte(a, 0xc3); }
-
-void ud2(Assembler &a)
-{
-	push_byte(a, 0x0f);
-	push_byte(a, 0x0b);
-}
-
+void ud2(Assembler &a) { push_bytes(a, 0x0b0f, 2); }
 void int3(Assembler &a) { push_byte(a, 0xcc); }
-
-void syscall(Assembler &a)
-{
-	push_byte(a, 0x0f);
-	push_byte(a, 0x05);
-}
-
+void syscall(Assembler &a) { push_bytes(a, 0x050f, 2); }
 void nop(Assembler &a) { push_byte(a, 0x90); }
-
-void mfence(Assembler &a)
-{
-	push_byte(a, 0x0f);
-	push_byte(a, 0xae);
-	push_byte(a, 0xf0);
-}
+void mfence(Assembler &a) { push_bytes(a, 0xf0ae0f, 3); }
+void rdtsc(Assembler &a) { push_bytes(a, 0x310f, 2); }

@@ -106,3 +106,4 @@ void int3(Assembler &a);
 void syscall(Assembler &a);
 void nop(Assembler &a);
 void mfence(Assembler &a);
+void rdtsc(Assembler &a);

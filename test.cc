@@ -111,6 +111,7 @@ label(a, "foo");
 	div(a, r9);                         expect(a, {0x49, 0xf7, 0xf1});
 	nop(a);                             expect(a, {0x90});
 	mfence(a);                          expect(a, {0x0f, 0xae, 0xf0});
+	rdtsc(a);                           expect(a, {0x0f, 0x31});
 	printf("OK\n");
 	clear(a);
 }
