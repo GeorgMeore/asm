@@ -49,7 +49,7 @@ void hello(Assembler &a)
 }
 
 // We can do dynamic code generation!
-int main(void)
+int main()
 {
 	Assembler a{};
 	hello(a);

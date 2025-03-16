@@ -19,7 +19,7 @@ void expect(const Assembler &a, const u8 b[], u64 s, const char *file, int line)
 #define expect(a, ...) expect(a, (u8[])__VA_ARGS__, sizeof((u8[])__VA_ARGS__), __FILE__, __LINE__)
 
 // TODO: add error cases
-int main(void)
+int main()
 {
 	Assembler a{};
 	// instruction                      // expected byte sequence

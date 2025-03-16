@@ -49,7 +49,7 @@ void start(Assembler &a)
 
 // You can use bin2elf.sh on the output of this program to get an executable
 // that exits with 10nth fibonacci number as it's exit code.
-int main(void)
+int main()
 {
 	Assembler a{};
 	start(a);
