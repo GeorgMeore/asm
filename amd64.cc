@@ -5,49 +5,32 @@
 #include "asm.hh"
 #include "amd64.hh"
 
-enum RCode {
-	A   = 0b0000,
-	C   = 0b0001,
-	D   = 0b0010,
-	B   = 0b0011,
-	SP  = 0b0100,
-	BP  = 0b0101,
-	SI  = 0b0110,
-	DI  = 0b0111,
-	R8  = 0b1000,
-	R9  = 0b1001,
-	R10 = 0b1010,
-	R11 = 0b1011,
-	R12 = 0b1100,
-	R13 = 0b1101,
-	R14 = 0b1110,
-	R15 = 0b1111,
-};
+namespace amd64 {
 
-const R rax = {A,   64}, eax  = {A,   32}, ax   = {A,   16}, al   = {A,   8};
-const R rcx = {C,   64}, ecx  = {C,   32}, cx   = {C,   16}, cl   = {C,   8};
-const R rdx = {D,   64}, edx  = {D,   32}, dx   = {D,   16}, dl   = {D,   8};
-const R rbx = {B,   64}, ebx  = {B,   32}, bx   = {B,   16}, bl   = {B,   8};
-const R rsp = {SP,  64}, esp  = {SP,  32}, sp   = {SP,  16}, spl  = {SP,  8};
-const R rbp = {BP,  64}, ebp  = {BP,  32}, bp   = {BP,  16}, bpl  = {BP,  8};
-const R rsi = {SI,  64}, esi  = {SI,  32}, si   = {SI,  16}, sil  = {SI,  8};
-const R rdi = {DI,  64}, edi  = {DI,  32}, di   = {DI,  16}, dil  = {DI,  8};
-const R r8  = {R8,  64}, r8d  = {R8,  32}, r8w  = {R8,  16}, r8b  = {R8,  8};
-const R r9  = {R9,  64}, r9d  = {R9,  32}, r9w  = {R9,  16}, r9b  = {R9,  8};
-const R r10 = {R10, 64}, r10d = {R10, 32}, r10w = {R10, 16}, r10b = {R10, 8};
-const R r11 = {R11, 64}, r11d = {R11, 32}, r11w = {R11, 16}, r11b = {R11, 8};
-const R r12 = {R12, 64}, r12d = {R12, 32}, r12w = {R12, 16}, r12b = {R12, 8};
-const R r13 = {R13, 64}, r13d = {R13, 32}, r13w = {R13, 16}, r13b = {R13, 8};
-const R r14 = {R14, 64}, r14d = {R14, 32}, r14w = {R14, 16}, r14b = {R14, 8};
-const R r15 = {R15, 64}, r15d = {R15, 32}, r15w = {R15, 16}, r15b = {R15, 8};
+const Reg rax = {0,  64}, eax  = {0,  32}, ax   = {0,  16}, al   = {0,  8};
+const Reg rcx = {1,  64}, ecx  = {1,  32}, cx   = {1,  16}, cl   = {1,  8};
+const Reg rdx = {2,  64}, edx  = {2,  32}, dx   = {2,  16}, dl   = {2,  8};
+const Reg rbx = {3,  64}, ebx  = {3,  32}, bx   = {3,  16}, bl   = {3,  8};
+const Reg rsp = {4,  64}, esp  = {4,  32}, sp   = {4,  16}, spl  = {4,  8};
+const Reg rbp = {5,  64}, ebp  = {5,  32}, bp   = {5,  16}, bpl  = {5,  8};
+const Reg rsi = {6,  64}, esi  = {6,  32}, si   = {6,  16}, sil  = {6,  8};
+const Reg rdi = {7,  64}, edi  = {7,  32}, di   = {7,  16}, dil  = {7,  8};
+const Reg r8  = {8,  64}, r8d  = {8,  32}, r8w  = {8,  16}, r8b  = {8,  8};
+const Reg r9  = {9,  64}, r9d  = {9,  32}, r9w  = {9,  16}, r9b  = {9,  8};
+const Reg r10 = {10, 64}, r10d = {10, 32}, r10w = {10, 16}, r10b = {10, 8};
+const Reg r11 = {11, 64}, r11d = {11, 32}, r11w = {11, 16}, r11b = {11, 8};
+const Reg r12 = {12, 64}, r12d = {12, 32}, r12w = {12, 16}, r12b = {12, 8};
+const Reg r13 = {13, 64}, r13d = {13, 32}, r13w = {13, 16}, r13b = {13, 8};
+const Reg r14 = {14, 64}, r14d = {14, 32}, r14w = {14, 16}, r14b = {14, 8};
+const Reg r15 = {15, 64}, r15d = {15, 32}, r15w = {15, 16}, r15b = {15, 8};
 
-static u8   size(R r) { return r.size; }
-static u8   code(R r) { return r.code & 0b111; }
-static bool isnew(R r) { return r.code & 0b1000; }
+static u8   size(Reg r) { return r.size; }
+static u8   code(Reg r) { return r.code & 0b111; }
+static bool isnew(Reg r) { return r.code & 0b1000; }
 
-I operator*(R r, u8 scale) { return {r, scale}; }
+I operator*(Reg r, u8 scale) { return {r, scale}; }
 
-static u8 offsetsize(PTR p)
+static u8 offsetsize(Ptr p)
 {
 	if (p.offset < -128 || p.offset > 127)
 		return 4;
@@ -56,24 +39,24 @@ static u8 offsetsize(PTR p)
 	return 0;
 }
 
-static u8 size(PTR p) { return p.base.code ? p.base.size : p.index.size; }
+static u8 size(Ptr p) { return p.base.code ? p.base.size : p.index.size; }
 
-PTR ptr(R base, I i, s32 offset) { return {offset, base, i.index, i.scale}; }
-PTR ptr(R base, s32 offset) { return ptr(base, {}, offset); }
-PTR ptr(I i, s32 offset) { return ptr({}, i, offset); }
-PTR ptr(s32 offset) { return ptr({}, {}, offset); }
+Ptr ptr(Reg base, I i, s32 offset) { return {offset, base, i.index, i.scale}; }
+Ptr ptr(Reg base, s32 offset) { return ptr(base, {}, offset); }
+Ptr ptr(I i, s32 offset) { return ptr({}, i, offset); }
+Ptr ptr(s32 offset) { return ptr({}, {}, offset); }
 
-static int ptr_err(PTR p)
+static int ptr_err(Ptr p)
 {
 	if (size(p.index) & 0x1f || size(p.base) & 0x1f)
-		return Amd64ErrSize; // less than 32 bits
+		return ErrSize; // less than 32 bits
 	if (size(p.index)) {
 		if (!p.scale || p.scale > 8 || p.scale&(p.scale - 1))
-			return Amd64ErrScale;
-		if (p.index.code == SP)
-			return Amd64ErrReg;
+			return ErrScale;
+		if (p.index.code == sp.code)
+			return ErrReg;
 		if (size(p.base) && size(p.base) != size(p.index))
-			return Amd64ErrSize;
+			return ErrSize;
 	}
 	return 0;
 }
@@ -127,7 +110,7 @@ static u8 sib(Scale scale, u8 index, u8 base)
 	return scale<<6 | index<<3 | base;
 }
 
-static void push_mod_sib_offset(Assembler &a, u8 reg, PTR p)
+static void push_mod_sib_offset(Assembler &a, u8 reg, Ptr p)
 {
 	if (!size(p.base)) {
 		push_byte(a, modrm(ModDisp0, reg, 0b100));
@@ -151,7 +134,7 @@ static void push_mod_sib_offset(Assembler &a, u8 reg, PTR p)
 	push_bytes(a, p.offset, osz);
 }
 
-static void push_prefixes(Assembler &a, R r, PTR p)
+static void push_prefixes(Assembler &a, Reg r, Ptr p)
 {
 	if (size(p) == 32)
 		push_byte(a, 0x67);
@@ -165,7 +148,7 @@ static void push_prefixes(Assembler &a, R r, PTR p)
 		push_byte(a, rex);
 }
 
-static void inst(Assembler &a, R r, PTR rm, u8 op)
+static void inst(Assembler &a, Reg r, Ptr rm, u8 op)
 {
 	if (!a.err)
 		a.err = ptr_err(rm);
@@ -176,7 +159,7 @@ static void inst(Assembler &a, R r, PTR rm, u8 op)
 	push_mod_sib_offset(a, code(r), rm);
 }
 
-static void push_prefixes(Assembler &a, R r, R rm)
+static void push_prefixes(Assembler &a, Reg r, Reg rm)
 {
 	if (size(r) == 16)
 		push_byte(a, 0x66);
@@ -188,10 +171,10 @@ static void push_prefixes(Assembler &a, R r, R rm)
 		push_byte(a, rex);
 }
 
-static void inst(Assembler &a, R r, R rm, u8 op)
+static void inst(Assembler &a, Reg r, Reg rm, u8 op)
 {
 	if (size(r) != size(rm)) {
-		a.err = Amd64ErrSize;
+		a.err = ErrSize;
 		return ud2(a);
 	}
 	push_prefixes(a, r, rm);
@@ -199,7 +182,7 @@ static void inst(Assembler &a, R r, R rm, u8 op)
 	push_byte(a, modrm(ModDirect, code(r), code(rm)));
 }
 
-static void push_prefixes(Assembler &a, R r)
+static void push_prefixes(Assembler &a, Reg r)
 {
 	if (size(r) == 16)
 		push_byte(a, 0x66);
@@ -212,28 +195,28 @@ static void push_prefixes(Assembler &a, R r)
 		push_byte(a, rex);
 }
 
-static void inst(Assembler &a, R dst, u8 src, u8 op)
+static void inst(Assembler &a, Reg dst, u8 src, u8 op)
 {
 	push_prefixes(a, dst);
 	push_byte(a, op + (size(dst) > 8));
 	push_byte(a, modrm(ModDirect, src, code(dst)));
 }
 
-void mov(Assembler &a, PTR dst, R src) { inst(a, src, dst, 0x88); }
-void mov(Assembler &a, R dst, PTR src) { inst(a, dst, src, 0x8a); }
-void mov(Assembler &a, R dst, R src) { inst(a, src, dst, 0x88); }
+void mov(Assembler &a, Ptr dst, Reg src) { inst(a, src, dst, 0x88); }
+void mov(Assembler &a, Reg dst, Ptr src) { inst(a, dst, src, 0x8a); }
+void mov(Assembler &a, Reg dst, Reg src) { inst(a, src, dst, 0x88); }
 
-void mov(Assembler &a, R dst, u64 src)
+void mov(Assembler &a, Reg dst, u64 src)
 {
 	push_prefixes(a, dst);
 	push_byte(a, size(dst) == 8 ? 0xb0 : 0xb8 + code(dst));
 	push_bytes(a, src, size(dst)/8);
 }
 
-void mov(Assembler &a, R dst, void *src)
+void mov(Assembler &a, Reg dst, void *src)
 {
-	if (dst.code != A) {
-		a.err = Amd64ErrReg;
+	if (dst.code != rax.code) {
+		a.err = ErrReg;
 		return ud2(a);
 	}
 	push_prefixes(a, dst);
@@ -241,10 +224,10 @@ void mov(Assembler &a, R dst, void *src)
 	push_bytes(a, (u64)src, 8);
 }
 
-void mov(Assembler &a, void *dst, R src)
+void mov(Assembler &a, void *dst, Reg src)
 {
-	if (src.code != A) {
-		a.err = Amd64ErrReg;
+	if (src.code != rax.code) {
+		a.err = ErrReg;
 		return ud2(a);
 	}
 	push_prefixes(a, src);
@@ -252,10 +235,10 @@ void mov(Assembler &a, void *dst, R src)
 	push_bytes(a, (u64)dst, 8);
 }
 
-void cmov(Assembler &a, Cond c, R dst, R src)
+void cmov(Assembler &a, Cond c, Reg dst, Reg src)
 {
 	if (size(src) != size(dst) || size(src) == 8) {
-		a.err = Amd64ErrSize;
+		a.err = ErrSize;
 		return ud2(a);
 	}
 	push_prefixes(a, dst, src);
@@ -264,12 +247,12 @@ void cmov(Assembler &a, Cond c, R dst, R src)
 	push_byte(a, modrm(ModDirect, code(dst), code(src)));
 }
 
-void cmov(Assembler &a, Cond c, R dst, PTR src)
+void cmov(Assembler &a, Cond c, Reg dst, Ptr src)
 {
 	if (!a.err)
 		a.err = ptr_err(src);
 	if (size(src) == 8)
-		a.err = Amd64ErrSize;
+		a.err = ErrSize;
 	if (a.err)
 		return ud2(a);
 	push_prefixes(a, dst, src);
@@ -278,25 +261,25 @@ void cmov(Assembler &a, Cond c, R dst, PTR src)
 	push_mod_sib_offset(a, code(dst), src);
 }
 
-void xchg(Assembler &a, R dst, PTR src) { inst(a, dst, src, 0x86); }
-void xchg(Assembler &a, R dst, R src) { inst(a, src, dst, 0x86); }
+void xchg(Assembler &a, Reg dst, Ptr src) { inst(a, dst, src, 0x86); }
+void xchg(Assembler &a, Reg dst, Reg src) { inst(a, src, dst, 0x86); }
 
-void lea(Assembler &a, R dst, PTR src)
+void lea(Assembler &a, Reg dst, Ptr src)
 {
 	if (size(dst) == 8) {
-		a.err = Amd64ErrSize;
+		a.err = ErrSize;
 		return ud2(a);
 	}
 	inst(a, dst, src, 0x8c);
 }
 
-void inc(Assembler &a, R dst) { inst(a, dst, 0b000, 0xfe); }
-void dec(Assembler &a, R dst) { inst(a, dst, 0b001, 0xfe); }
+void inc(Assembler &a, Reg dst) { inst(a, dst, 0b000, 0xfe); }
+void dec(Assembler &a, Reg dst) { inst(a, dst, 0b001, 0xfe); }
 
-static void arith(Assembler &a, R dst, u32 src, u8 op)
+static void arith(Assembler &a, Reg dst, u32 src, u8 op)
 {
 	push_prefixes(a, dst);
-	if (dst.code == A) {
+	if (dst.code == rax.code) {
 		push_byte(a, 0x05);
 	} else {
 		push_byte(a, 0x80 + (size(dst) > 8));
@@ -308,21 +291,21 @@ static void arith(Assembler &a, R dst, u32 src, u8 op)
 		push_bytes(a, src, size(dst)/8);
 }
 
-void add(Assembler &a, R dst, R src) { inst(a, src, dst, 0b000 << 3); }
-void add(Assembler &a, R dst, u32 src) { arith(a, dst, src, 0b000); }
-void or_(Assembler &a, R dst, R src) { inst(a, src, dst, 0b001 << 3); }
-void or_(Assembler &a, R dst, u32 src) { arith(a, dst, src, 0b001); }
-void and_(Assembler &a, R dst, R src) { inst(a, src, dst, 0b100 << 3); }
-void and_(Assembler &a, R dst, u32 src) { arith(a, dst, src, 0b100); }
-void sub(Assembler &a, R dst, R src) { inst(a, src, dst, 0b101 << 3); }
-void sub(Assembler &a, R dst, u32 src) { arith(a, dst, src, 0b101); }
-void xor_(Assembler &a, R dst, R src) { inst(a, src, dst, 0b110 << 3); }
-void xor_(Assembler &a, R dst, u32 src) { arith(a, dst, src, 0b110); }
-void cmp(Assembler &a, R dst, R src) { inst(a, src, dst, 0b111 << 3); }
-void cmp(Assembler &a, R dst, u32 src) { arith(a, dst, src, 0b111); }
+void add(Assembler &a, Reg dst, Reg src) { inst(a, src, dst, 0b000 << 3); }
+void add(Assembler &a, Reg dst, u32 src) { arith(a, dst, src, 0b000); }
+void or_(Assembler &a, Reg dst, Reg src) { inst(a, src, dst, 0b001 << 3); }
+void or_(Assembler &a, Reg dst, u32 src) { arith(a, dst, src, 0b001); }
+void and_(Assembler &a, Reg dst, Reg src) { inst(a, src, dst, 0b100 << 3); }
+void and_(Assembler &a, Reg dst, u32 src) { arith(a, dst, src, 0b100); }
+void sub(Assembler &a, Reg dst, Reg src) { inst(a, src, dst, 0b101 << 3); }
+void sub(Assembler &a, Reg dst, u32 src) { arith(a, dst, src, 0b101); }
+void xor_(Assembler &a, Reg dst, Reg src) { inst(a, src, dst, 0b110 << 3); }
+void xor_(Assembler &a, Reg dst, u32 src) { arith(a, dst, src, 0b110); }
+void cmp(Assembler &a, Reg dst, Reg src) { inst(a, src, dst, 0b111 << 3); }
+void cmp(Assembler &a, Reg dst, u32 src) { arith(a, dst, src, 0b111); }
 
-void mul(Assembler &a, R src) { inst(a, src, 0x4, 0xf6); }
-void div(Assembler &a, R src) { inst(a, src, 0x6, 0xf6); }
+void mul(Assembler &a, Reg src) { inst(a, src, 0x4, 0xf6); }
+void div(Assembler &a, Reg src) { inst(a, src, 0x6, 0xf6); }
 
 void jcc(Assembler &a, Cond c, const char *l)
 {
@@ -337,7 +320,7 @@ static void jump(Assembler &a, const char *dst, u8 op)
 	push_label_offset(a, dst);
 }
 
-static void jump(Assembler &a, PTR dst, u8 op)
+static void jump(Assembler &a, Ptr dst, u8 op)
 {
 	if (!a.err)
 		a.err = ptr_err(dst);
@@ -352,10 +335,10 @@ static void jump(Assembler &a, PTR dst, u8 op)
 	push_mod_sib_offset(a, op, dst);
 }
 
-static void jump(Assembler &a, R dst, u8 op)
+static void jump(Assembler &a, Reg dst, u8 op)
 {
 	if (size(dst) != 64) {
-		a.err = Amd64ErrSize;
+		a.err = ErrSize;
 		return ud2(a);
 	}
 	if (isnew(dst))
@@ -365,16 +348,16 @@ static void jump(Assembler &a, R dst, u8 op)
 }
 
 void jmp(Assembler &a, const char *dst) { jump(a, dst, 0xe9); }
-void jmp(Assembler &a, PTR dst) { jump(a, dst, 0b100); }
-void jmp(Assembler &a, R dst) { jump(a, dst, 0b100); }
+void jmp(Assembler &a, Ptr dst) { jump(a, dst, 0b100); }
+void jmp(Assembler &a, Reg dst) { jump(a, dst, 0b100); }
 void call(Assembler &a, const char *dst) { jump(a, dst, 0xe8); }
-void call(Assembler &a, PTR dst) { jump(a, dst, 0b010); }
-void call(Assembler &a, R dst) { jump(a, dst, 0b010); }
+void call(Assembler &a, Ptr dst) { jump(a, dst, 0b010); }
+void call(Assembler &a, Reg dst) { jump(a, dst, 0b010); }
 
-void push(Assembler &a, R dst)
+void push(Assembler &a, Reg dst)
 {
 	if (size(dst) != 64) {
-		a.err = Amd64ErrSize;
+		a.err = ErrSize;
 		return ud2(a);
 	}
 	if (isnew(dst))
@@ -382,10 +365,10 @@ void push(Assembler &a, R dst)
 	push_byte(a, 0x50 + code(dst));
 }
 
-void pop(Assembler &a, R dst)
+void pop(Assembler &a, Reg dst)
 {
 	if (size(dst) != 64) {
-		a.err = Amd64ErrSize;
+		a.err = ErrSize;
 		return ud2(a);
 	}
 	if (isnew(dst))
@@ -400,3 +383,5 @@ void syscall(Assembler &a) { push_bytes(a, 0x050f, 2); }
 void nop(Assembler &a) { push_byte(a, 0x90); }
 void mfence(Assembler &a) { push_bytes(a, 0xf0ae0f, 3); }
 void rdtsc(Assembler &a) { push_bytes(a, 0x310f, 2); }
+
+}

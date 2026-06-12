@@ -6,6 +6,8 @@
 #include "asm.hh"
 #include "amd64.hh"
 
+using namespace amd64;
+
 void *link(Assembler &a)
 {
 	if (a.err) {
@@ -26,7 +28,7 @@ void sum(Assembler &a)
 {
 label(a, "sum");
 	cmp(a, rdi, 0);
-	jcc(a, CondE, "return0");
+	jcc(a, E, "return0");
 	push(a, rdi);
 	dec(a, rdi);
 	call(a, "sum");

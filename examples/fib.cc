@@ -5,6 +5,8 @@
 #include "asm.hh"
 #include "amd64.hh"
 
+using namespace amd64;
+
 void dump(Assembler &a)
 {
 	if (a.err) {
@@ -28,7 +30,7 @@ label(a, "fib");
 	mov(a, rcx, 1);
 label(a, "loop");
 	cmp(a, rdi, 0);
-	jcc(a, CondE, "return");
+	jcc(a, E, "return");
 	mov(a, rdx, rcx);
 	add(a, rcx, rax);
 	mov(a, rax, rdx);
