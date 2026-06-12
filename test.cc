@@ -5,6 +5,7 @@
 #include "arena.hh"
 #include "asm.hh"
 #include "amd64.hh"
+#include "arm64.hh"
 
 void expect(const Assembler &a, const u8 b[], u64 s, const char *file, int line)
 {
@@ -19,7 +20,8 @@ void expect(const Assembler &a, const u8 b[], u64 s, const char *file, int line)
 #define expect(a, ...) expect(a, (u8[])__VA_ARGS__, sizeof((u8[])__VA_ARGS__), __FILE__, __LINE__)
 
 // TODO: add error cases
-int main()
+
+void testamd64()
 {
 	using namespace amd64;
 	Assembler a{};
@@ -113,6 +115,39 @@ label(a, "foo");
 	nop(a);                             expect(a, {0x90});
 	mfence(a);                          expect(a, {0x0f, 0xae, 0xf0});
 	rdtsc(a);                           expect(a, {0x0f, 0x31});
-	printf("OK\n");
 	clear(a);
+}
+
+void testarm64()
+{
+	using namespace arm64;
+	Assembler a{};
+	// instruction                 // expected byte sequence
+	udf(a, 0x15);                  expect(a, {0x15, 0x00, 0x00, 0x00});
+	svc(a, 0x80);                  expect(a, {0x01, 0x10, 0x00, 0xd4});
+	adc(a, x5, x6, x7);            expect(a, {0xc5, 0x00, 0x07, 0x9a});
+	adc(a, xzr, xzr, x7);          expect(a, {0xff, 0x03, 0x07, 0x9a});
+	add(a, x5, x2, x17, UXTX, 4);  expect(a, {0x45, 0x70, 0x31, 0x8b});
+	add(a, x4, xzr, x17, LSL, 61); expect(a, {0xe4, 0xf7, 0x11, 0x8b});
+	add(a, x5, x6, 1234, LSL, 12); expect(a, {0xc5, 0x48, 0x53, 0x91});
+label(a, "foo");
+	add(a, x17, x8, 4077);         expect(a, {0x11, 0xb5, 0x3f, 0x91});
+	b(a, "foo");                   expect(a, {0xff, 0xff, 0xff, 0x17});
+	b(a, CC, "foo");               expect(a, {0xc3, 0xff, 0xff, 0x54});
+	b(a, "bar");
+label(a, "bar");
+	                               expect(a, {0x01, 0x00, 0x00, 0x14});
+	sdiv(a, x23, x9, x12);         expect(a, {0x37, 0x0d, 0xcc, 0x9a});
+	udiv(a, x21, x19, x2);         expect(a, {0x75, 0x0a, 0xc2, 0x9a});
+	clear(a);
+}
+
+int main()
+{
+	printf("testing amd64\n");
+	testamd64();
+	printf("testing arm64\n");
+	testarm64();
+	printf("all passed\n");
+	return 0;
 }
