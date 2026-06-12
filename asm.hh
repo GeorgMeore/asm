@@ -14,9 +14,10 @@ struct Symbol {
 };
 
 enum AsmError {
-	ErrDupLabel,
+	ErrDupLabel = 1,
 	ErrOverflow,
 	ErrPatchParam,
+	AsmErrCount,
 };
 
 struct Assembler {

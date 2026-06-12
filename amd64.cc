@@ -28,6 +28,13 @@ static u8   size(Reg r) { return r.size; }
 static u8   code(Reg r) { return r.code & 0b111; }
 static bool isnew(Reg r) { return r.code & 0b1000; }
 
+static bool isspecial(Reg r)
+{
+	// spl-dil require special treatment to distinguish from
+	// ah-bh (which I do not support)
+	return r.size == 8 && r.code >= sp.code && r.code <= di.code;
+}
+
 I operator*(Reg r, u8 scale) { return {r, scale}; }
 
 static u8 offsetsize(Ptr p)
@@ -39,7 +46,7 @@ static u8 offsetsize(Ptr p)
 	return 0;
 }
 
-static u8 size(Ptr p) { return p.base.code ? p.base.size : p.index.size; }
+static u8 size(Ptr p) { return p.base.size ? p.base.size : p.index.size; }
 
 Ptr ptr(Reg base, I i, s32 offset) { return {offset, base, i.index, i.scale}; }
 Ptr ptr(Reg base, s32 offset) { return ptr(base, {}, offset); }
@@ -62,6 +69,7 @@ static int ptr_err(Ptr p)
 }
 
 enum REX {
+	REX0 = 0b01000000,
 	REXW = 0b01001000,
 	REXR = 0b01000100,
 	REXX = 0b01000010,
@@ -141,6 +149,8 @@ static void push_prefixes(Assembler &a, Reg r, Ptr p)
 	if (size(r) == 16)
 		push_byte(a, 0x66);
 	u8 rex = 0;
+	if (isspecial(r) || isspecial(p.index) || isspecial(p.base))
+		rex |= REX0;
 	if (size(r) == 64)
 		rex |= REXW;
 	rex |= isnew(r)*REXR | isnew(p.index)*REXX | isnew(p.base)*REXB;
@@ -164,6 +174,8 @@ static void push_prefixes(Assembler &a, Reg r, Reg rm)
 	if (size(r) == 16)
 		push_byte(a, 0x66);
 	u8 rex = 0;
+	if (isspecial(r) || isspecial(rm))
+		rex |= REX0;
 	if (size(r) == 64)
 		rex |= REXW;
 	rex |= isnew(r)*REXR | isnew(rm)*REXB;
@@ -187,6 +199,8 @@ static void push_prefixes(Assembler &a, Reg r)
 	if (size(r) == 16)
 		push_byte(a, 0x66);
 	u8 rex = 0;
+	if (isspecial(r))
+		rex |= REX0;
 	if (size(r) == 64)
 		rex |= REXW;
 	if (isnew(r))
@@ -209,7 +223,7 @@ void mov(Assembler &a, Reg dst, Reg src) { inst(a, src, dst, 0x88); }
 void mov(Assembler &a, Reg dst, u64 src)
 {
 	push_prefixes(a, dst);
-	push_byte(a, size(dst) == 8 ? 0xb0 : 0xb8 + code(dst));
+	push_byte(a, (size(dst) == 8 ? 0xb0 : 0xb8) + code(dst));
 	push_bytes(a, src, size(dst)/8);
 }
 
@@ -280,7 +294,7 @@ static void arith(Assembler &a, Reg dst, u32 src, u8 op)
 {
 	push_prefixes(a, dst);
 	if (dst.code == rax.code) {
-		push_byte(a, 0x05);
+		push_byte(a, 0x04 + (op << 3) + (size(dst) > 8));
 	} else {
 		push_byte(a, 0x80 + (size(dst) > 8));
 		push_byte(a, modrm(ModDirect, op, code(dst)));

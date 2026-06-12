@@ -41,8 +41,8 @@ const Reg lr  = {30, true, false}, x30 = {30, true,  false}, w30 = {30, false, f
 const Reg xzr = {31, true, false}, wzr = {31, false, false};
 const Reg sp  = {31, true, true},  wsp = {31, false, true};
 
-static bool is_zr(Reg r) { return r.code == 31 && !r.sp; }
-static bool is_sp(Reg r) { return r.sp; }
+static bool iszr(Reg r) { return r.code == 31 && !r.sp; }
+static bool issp(Reg r) { return r.sp; }
 
 struct Inst {
 	u32 v;
@@ -70,12 +70,16 @@ void udf(Assembler &a, u16 imm)
 
 void svc(Assembler &a, u16 imm)
 {
-	push_bytes(a, (0b11010100000 << 21) | (imm << 5) | 0b00001, 4);
+	Inst i = {};
+	push_bits(i, 0b00001, 5);
+	push_bits(i, imm, 16);
+	push_bits(i, 0b11010100000, 11);
+	push_inst(a, i);
 }
 
 static void inst3r(Assembler &a, Reg d, Reg n, Reg m, u8 c1, u16 c2)
 {
-	if (is_sp(d) || is_sp(n) || is_sp(m)) {
+	if (issp(d) || issp(n) || issp(m)) {
 		a.err = ErrReg;
 		return udf(a, 0);
 	}
@@ -99,7 +103,7 @@ void udiv(Assembler &a, Reg d, Reg n, Reg m) { return inst3r(a, d, n, m, 2, 0b00
 
 void add(Assembler &a, Reg d, Reg n, Reg m, Extend e, u8 imm3)
 {
-	if (is_zr(d) || is_zr(n) || is_sp(m)) {
+	if (iszr(d) || iszr(n) || issp(m)) {
 		a.err = ErrReg;
 		return udf(a, 0);
 	}
@@ -120,7 +124,7 @@ void add(Assembler &a, Reg d, Reg n, Reg m, Extend e, u8 imm3)
 
 void add(Assembler &a, Reg d, Reg n, Reg m, Shift s, u8 imm6)
 {
-	if (is_sp(d) || is_sp(n) || is_sp(m)) {
+	if (issp(d) || issp(n) || issp(m)) {
 		a.err = ErrReg;
 		return udf(a, 0);
 	}
@@ -142,7 +146,7 @@ void add(Assembler &a, Reg d, Reg n, Reg m, Shift s, u8 imm6)
 
 void add(Assembler &a, Reg d, Reg n, u16 imm12, Shift s, u8 simm)
 {
-	if (is_zr(d) || is_zr(n)) {
+	if (iszr(d) || iszr(n)) {
 		a.err = ErrReg;
 		return udf(a, 0);
 	}

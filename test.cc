@@ -9,8 +9,8 @@
 
 void expect(const Assembler &a, const u8 b[], u64 s, const char *file, int line)
 {
-	for (u8 i = 0; i < s; i++) {
-		if (a.ip < i || a.code[a.ip-1-i] != b[s-1-i]) {
+	for (u64 i = 0; i < s; i++) {
+		if (a.ip <= i || a.code[a.ip-1-i] != b[s-1-i]) {
 			printf("Test failed: %s:%d\n", file, line);
 			exit(1);
 		}
@@ -59,7 +59,9 @@ label(a, "foo");
 	add(a, al, r12b);                   expect(a, {0x44, 0x00, 0xe0});
 	add(a, r13b, r8b);                  expect(a, {0x45, 0x00, 0xc5});
 	or_(a, eax, ecx);                   expect(a, {0x09, 0xc8});
+	or_(a, eax, 588);                   expect(a, {0x0d, 0x4c, 0x02, 0x00, 0x00});
 	or_(a, al, r12b);                   expect(a, {0x44, 0x08, 0xe0});
+	or_(a, al, spl);                    expect(a, {0x40, 0x08, 0xe0});
 	or_(a, r13b, r8b);                  expect(a, {0x45, 0x08, 0xc5});
 	and_(a, eax, ecx);                  expect(a, {0x21, 0xc8});
 	and_(a, al, r12b);                  expect(a, {0x44, 0x20, 0xe0});
@@ -115,6 +117,8 @@ label(a, "foo");
 	nop(a);                             expect(a, {0x90});
 	mfence(a);                          expect(a, {0x0f, 0xae, 0xf0});
 	rdtsc(a);                           expect(a, {0x0f, 0x31});
+	mov(a, ebx, ptr(eax, 8));           expect(a, {0x67, 0x8b, 0x58, 0x08});
+	mov(a, bl, 5);                      expect(a, {0xb3, 0x05});
 	clear(a);
 }
 

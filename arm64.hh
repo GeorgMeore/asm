@@ -41,7 +41,7 @@ extern const Reg xzr, wzr;
 extern const Reg sp,  wsp;
 
 enum Error {
-	ErrReg,
+	ErrReg = AsmErrCount,
 	ErrSize,
 };
 

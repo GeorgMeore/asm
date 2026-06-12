@@ -1,5 +1,6 @@
 #include <sys/mman.h>
 #include <string.h>
+#include <assert.h>
 
 #include "types.hh"
 #include "arena.hh"
@@ -19,6 +20,7 @@ void push_bytes(Assembler &a, u64 v, u8 count)
 {
 	if (!a.code)
 		a.code = (u8 *)mmap(0, CodeSize, PROT_READ|PROT_WRITE, MAP_ANONYMOUS|MAP_PRIVATE|MAP_NORESERVE, -1, 0);
+	assert(a.code != MAP_FAILED);
 	if (a.ip > CodeSize - count) {
 		a.err = ErrOverflow;
 		return;
@@ -56,7 +58,7 @@ static void patch_ref(Assembler &a, u32 addr, u32 pos, u32 sub, u32 div, u8 len,
 		return;
 	}
 	s64 v = (s64)addr - (s64)sub;
-	if (len == 0 || len > 32 || off > 32 || v % div) {
+	if (!len || len > 32 || off >= 32 || !div || v % div) {
 		a.err = ErrPatchParam;
 		return;
 	}

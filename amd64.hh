@@ -23,7 +23,7 @@ extern const Reg r14, r14d, r14w, r14b;
 extern const Reg r15, r15d, r15w, r15b;
 
 enum Error {
-	ErrScale,
+	ErrScale = AsmErrCount,
 	ErrReg,
 	ErrSize,
 };

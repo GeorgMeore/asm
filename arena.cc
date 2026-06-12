@@ -1,5 +1,6 @@
 #include <sys/mman.h>
 #include <stdio.h>
+#include <assert.h>
 
 #include "types.hh"
 #include "arena.hh"
@@ -17,15 +18,14 @@ void *alloc(Arena &a, u32 size, u16 align)
 		return 0;
 	if (free_size(a.p) < size + align) {
 		Page *p = (Page *)mmap(0, PageSize, PROT_READ|PROT_WRITE, MAP_ANONYMOUS|MAP_PRIVATE, -1, 0);
-		if (p == MAP_FAILED)
-			return 0;
+		assert(p != MAP_FAILED);
 		p->next = a.p;
 		p->data = (u8 *)p + sizeof(Page);
 		a.p = p;
 	}
 	u64 d = (u64)a.p->data % align;
 	if (d)
-		a.p->data += d;
+		a.p->data += align - d;
 	void *ptr = a.p->data;
 	a.p->data += size;
 	return (void *)ptr;
