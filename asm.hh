@@ -1,6 +1,8 @@
 struct Ref {
 	Ref *next;
-	u32 addr;
+	u32 pos;
+	u32 sub, div;
+	u8  len, off;
 };
 
 struct Symbol {
@@ -12,8 +14,9 @@ struct Symbol {
 };
 
 enum AsmError {
-	AsmErrDupLabel,
-	AsmErrOverflow,
+	ErrDupLabel,
+	ErrOverflow,
+	ErrPatchParam,
 };
 
 struct Assembler {
@@ -28,4 +31,4 @@ void clear(Assembler &a);
 void push_byte(Assembler &a, u8 b);
 void push_bytes(Assembler &a, u64 v, u8 count);
 void label(Assembler &a, const char *name);
-void push_label_offset(Assembler &a, const char *name);
+void label_ref(Assembler &a, const char *name, u32 pos, u32 sub, u32 div, u8 len, u8 off);

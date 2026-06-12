@@ -311,13 +311,15 @@ void jcc(Assembler &a, Cond c, const char *l)
 {
 	push_byte(a, 0x0f);
 	push_byte(a, 0x80 + c);
-	push_label_offset(a, l);
+	push_bytes(a, 0, 4); // label placeholder
+	label_ref(a, l, a.ip - 4, a.ip, 1, 32, 0);
 }
 
 static void jump(Assembler &a, const char *dst, u8 op)
 {
 	push_byte(a, op);
-	push_label_offset(a, dst);
+	push_bytes(a, 0, 4); // label placeholder
+	label_ref(a, dst, a.ip - 4, a.ip, 1, 32, 0);
 }
 
 static void jump(Assembler &a, Ptr dst, u8 op)
