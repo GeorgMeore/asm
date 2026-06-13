@@ -64,7 +64,7 @@ enum Cond {
 	NV,
 };
 
-enum Extend {
+enum Ex {
 	UXTB = 0b000,
 	UXTH,
 	UXTW,
@@ -75,7 +75,7 @@ enum Extend {
 	SXTX,
 };
 
-enum Shift {
+enum Sh {
 	LSL = 0b00,
 	LSR,
 	ASR,
@@ -84,9 +84,14 @@ enum Shift {
 void udf(Assembler &a, u16 imm);
 void svc(Assembler &a, u16 imm);
 void adc(Assembler &a, Reg d, Reg n, Reg m);
-void add(Assembler &a, Reg d, Reg n, Reg m, Extend e, u8 imm3 = 0);
-void add(Assembler &a, Reg d, Reg n, Reg m, Shift s, u8 imm6 = 0);
-void add(Assembler &a, Reg d, Reg n, u16 imm12, Shift s = LSL, u8 simm = 0);
+void add(Assembler &a, Reg d, Reg n, Reg m);
+void add(Assembler &a, Reg d, Reg n, Reg m, Ex e, u8 imm3 = 0);
+void add(Assembler &a, Reg d, Reg n, Reg m, Sh s, u8 imm6 = 0);
+void add(Assembler &a, Reg d, Reg n, u16 imm12, Sh s = LSL, u8 simm = 0);
+void sub(Assembler &a, Reg d, Reg n, Reg m);
+void sub(Assembler &a, Reg d, Reg n, Reg m, Ex e, u8 imm3 = 0);
+void sub(Assembler &a, Reg d, Reg n, Reg m, Sh s, u8 imm6 = 0);
+void sub(Assembler &a, Reg d, Reg n, u16 imm12, Sh s = LSL, u8 simm = 0);
 void sdiv(Assembler &a, Reg d, Reg n, Reg m);
 void udiv(Assembler &a, Reg d, Reg n, Reg m);
 void b(Assembler &a, const char *label);

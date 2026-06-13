@@ -77,7 +77,7 @@ void svc(Assembler &a, u16 imm)
 	push_inst(a, i);
 }
 
-static void inst3r(Assembler &a, Reg d, Reg n, Reg m, u8 c1, u16 c2)
+static void inst3r(Assembler &a, u8 c1, u16 c2, Reg d, Reg n, Reg m)
 {
 	if (issp(d) || issp(n) || issp(m)) {
 		a.err = ErrReg;
@@ -97,11 +97,11 @@ static void inst3r(Assembler &a, Reg d, Reg n, Reg m, u8 c1, u16 c2)
 	push_inst(a, i);
 }
 
-void adc(Assembler &a, Reg d, Reg n, Reg m) { return inst3r(a, d, n, m, 0, 0b0011010000); }
-void sdiv(Assembler &a, Reg d, Reg n, Reg m) { return inst3r(a, d, n, m, 3, 0b0011010110); }
-void udiv(Assembler &a, Reg d, Reg n, Reg m) { return inst3r(a, d, n, m, 2, 0b0011010110); }
+void adc(Assembler &a, Reg d, Reg n, Reg m)  { return inst3r(a, 0, 0b0011010000, d, n, m); }
+void sdiv(Assembler &a, Reg d, Reg n, Reg m) { return inst3r(a, 3, 0b0011010110, d, n, m); }
+void udiv(Assembler &a, Reg d, Reg n, Reg m) { return inst3r(a, 2, 0b0011010110, d, n, m); }
 
-void add(Assembler &a, Reg d, Reg n, Reg m, Extend e, u8 imm3)
+void inste(Assembler &a, u16 c, Reg d, Reg n, Reg m, Ex e, u8 imm3)
 {
 	if (iszr(d) || iszr(n) || issp(m)) {
 		a.err = ErrReg;
@@ -117,12 +117,12 @@ void add(Assembler &a, Reg d, Reg n, Reg m, Extend e, u8 imm3)
 	push_bits(i, imm3, 3);
 	push_bits(i, e, 3);
 	push_bits(i, m.code, 5);
-	push_bits(i, 0b0001011001, 10);
+	push_bits(i, c, 10);
 	push_bits(i, d.sf, 1);
 	push_inst(a, i);
 }
 
-void add(Assembler &a, Reg d, Reg n, Reg m, Shift s, u8 imm6)
+void insts(Assembler &a, u8 c, Reg d, Reg n, Reg m, Sh s, u8 imm6)
 {
 	if (issp(d) || issp(n) || issp(m)) {
 		a.err = ErrReg;
@@ -139,12 +139,12 @@ void add(Assembler &a, Reg d, Reg n, Reg m, Shift s, u8 imm6)
 	push_bits(i, m.code, 5);
 	push_bits(i, 0, 1);
 	push_bits(i, s, 2);
-	push_bits(i, 0b0001011, 7);
+	push_bits(i, c, 7);
 	push_bits(i, d.sf, 1);
 	push_inst(a, i);
 }
 
-void add(Assembler &a, Reg d, Reg n, u16 imm12, Shift s, u8 simm)
+void insti(Assembler &a, u8 c, Reg d, Reg n, u16 imm12, Sh s, u8 simm)
 {
 	if (iszr(d) || iszr(n)) {
 		a.err = ErrReg;
@@ -159,9 +159,29 @@ void add(Assembler &a, Reg d, Reg n, u16 imm12, Shift s, u8 simm)
 	push_bits(i, n.code, 5);
 	push_bits(i, imm12, 12);
 	push_bits(i, simm == 12, 1);
-	push_bits(i, 0b00100010, 8);
+	push_bits(i, c, 8);
 	push_bits(i, d.sf, 1);
 	push_inst(a, i);
+}
+
+void add(Assembler &a, Reg d, Reg n, Reg m, Ex e, u8 imm3) { inste(a, 0b0001011001, d, n, m, e, imm3); }
+void add(Assembler &a, Reg d, Reg n, Reg m, Sh s, u8 imm6) { insts(a, 0b0001011, d, n, m, s, imm6); }
+void add(Assembler &a, Reg d, Reg n, u16 imm12, Sh s, u8 simm) { insti(a, 0b00100010, d, n, imm12, s, simm); }
+void add(Assembler &a, Reg d, Reg n, Reg m)
+{
+	if (issp(d) || issp(n))
+		return add(a, d, n, m, d.sf ? UXTX : UXTW, 0);
+	return add(a, d, n, m, LSL, 0);
+}
+
+void sub(Assembler &a, Reg d, Reg n, Reg m, Ex e, u8 imm3) { inste(a, 0b1001011001, d, n, m, e, imm3); }
+void sub(Assembler &a, Reg d, Reg n, Reg m, Sh s, u8 imm6) { insts(a, 0b1001011, d, n, m, s, imm6); }
+void sub(Assembler &a, Reg d, Reg n, u16 imm12, Sh s, u8 simm) { insti(a, 0b10100010, d, n, imm12, s, simm); }
+void sub(Assembler &a, Reg d, Reg n, Reg m)
+{
+	if (issp(d) || issp(n))
+		return sub(a, d, n, m, d.sf ? UXTX : UXTW, 0);
+	return sub(a, d, n, m, LSL, 0);
 }
 
 void b(Assembler &a, const char *label)

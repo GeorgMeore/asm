@@ -14,8 +14,7 @@ static u32 free_size(Page *p)
 
 void *alloc(Arena &a, u32 size, u16 align)
 {
-	if (size + align > PageSize - sizeof(Page))
-		return 0;
+	assert (size + align <= PageSize - sizeof(Page));
 	if (free_size(a.p) < size + align) {
 		Page *p = (Page *)mmap(0, PageSize, PROT_READ|PROT_WRITE, MAP_ANONYMOUS|MAP_PRIVATE, -1, 0);
 		assert(p != MAP_FAILED);
