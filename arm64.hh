@@ -88,13 +88,28 @@ void add(Assembler &a, Reg d, Reg n, Reg m);
 void add(Assembler &a, Reg d, Reg n, Reg m, Ex e, u8 imm3 = 0);
 void add(Assembler &a, Reg d, Reg n, Reg m, Sh s, u8 imm6 = 0);
 void add(Assembler &a, Reg d, Reg n, u16 imm12, Sh s = LSL, u8 simm = 0);
+void adds(Assembler &a, Reg d, Reg n, Reg m);
+void adds(Assembler &a, Reg d, Reg n, Reg m, Ex e, u8 imm3 = 0);
+void adds(Assembler &a, Reg d, Reg n, Reg m, Sh s, u8 imm6 = 0);
+void adds(Assembler &a, Reg d, Reg n, u16 imm12, Sh s = LSL, u8 simm = 0);
 void sub(Assembler &a, Reg d, Reg n, Reg m);
 void sub(Assembler &a, Reg d, Reg n, Reg m, Ex e, u8 imm3 = 0);
 void sub(Assembler &a, Reg d, Reg n, Reg m, Sh s, u8 imm6 = 0);
 void sub(Assembler &a, Reg d, Reg n, u16 imm12, Sh s = LSL, u8 simm = 0);
+void subs(Assembler &a, Reg d, Reg n, Reg m);
+void subs(Assembler &a, Reg d, Reg n, Reg m, Ex e, u8 imm3 = 0);
+void subs(Assembler &a, Reg d, Reg n, Reg m, Sh s, u8 imm6 = 0);
+void subs(Assembler &a, Reg d, Reg n, u16 imm12, Sh s = LSL, u8 simm = 0);
+void cmp(Assembler &a, Reg n, Reg m);
+void cmp(Assembler &a, Reg n, Reg m, Ex e, u8 imm3 = 0);
+void cmp(Assembler &a, Reg n, Reg m, Sh s, u8 imm6 = 0);
+void cmp(Assembler &a, Reg n, u16 imm12, Sh s = LSL, u8 simm = 0);
 void sdiv(Assembler &a, Reg d, Reg n, Reg m);
 void udiv(Assembler &a, Reg d, Reg n, Reg m);
 void b(Assembler &a, const char *label);
 void b(Assembler &a, Cond c, const char *label);
+void bl(Assembler &a, const char *label);
+void br(Assembler &a, Reg n);
+void blr(Assembler &a, Reg n);
 
 }

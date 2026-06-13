@@ -101,9 +101,9 @@ void adc(Assembler &a, Reg d, Reg n, Reg m)  { return inst3r(a, 0, 0b0011010000,
 void sdiv(Assembler &a, Reg d, Reg n, Reg m) { return inst3r(a, 3, 0b0011010110, d, n, m); }
 void udiv(Assembler &a, Reg d, Reg n, Reg m) { return inst3r(a, 2, 0b0011010110, d, n, m); }
 
-void inste(Assembler &a, u16 c, Reg d, Reg n, Reg m, Ex e, u8 imm3)
+static void inste(Assembler &a, bool spd, u16 c, Reg d, Reg n, Reg m, Ex e, u8 imm3)
 {
-	if (iszr(d) || iszr(n) || issp(m)) {
+	if ((spd && iszr(d)) || (!spd && issp(d)) || iszr(n) || issp(m)) {
 		a.err = ErrReg;
 		return udf(a, 0);
 	}
@@ -122,7 +122,7 @@ void inste(Assembler &a, u16 c, Reg d, Reg n, Reg m, Ex e, u8 imm3)
 	push_inst(a, i);
 }
 
-void insts(Assembler &a, u8 c, Reg d, Reg n, Reg m, Sh s, u8 imm6)
+static void insts(Assembler &a, u8 c, Reg d, Reg n, Reg m, Sh s, u8 imm6)
 {
 	if (issp(d) || issp(n) || issp(m)) {
 		a.err = ErrReg;
@@ -144,9 +144,9 @@ void insts(Assembler &a, u8 c, Reg d, Reg n, Reg m, Sh s, u8 imm6)
 	push_inst(a, i);
 }
 
-void insti(Assembler &a, u8 c, Reg d, Reg n, u16 imm12, Sh s, u8 simm)
+static void insti(Assembler &a, bool spd, u8 c, Reg d, Reg n, u16 imm12, Sh s, u8 simm)
 {
-	if (iszr(d) || iszr(n)) {
+	if ((spd && iszr(d)) || (!spd && issp(d)) || iszr(n)) {
 		a.err = ErrReg;
 		return udf(a, 0);
 	}
@@ -164,25 +164,37 @@ void insti(Assembler &a, u8 c, Reg d, Reg n, u16 imm12, Sh s, u8 simm)
 	push_inst(a, i);
 }
 
-void add(Assembler &a, Reg d, Reg n, Reg m, Ex e, u8 imm3) { inste(a, 0b0001011001, d, n, m, e, imm3); }
-void add(Assembler &a, Reg d, Reg n, Reg m, Sh s, u8 imm6) { insts(a, 0b0001011, d, n, m, s, imm6); }
-void add(Assembler &a, Reg d, Reg n, u16 imm12, Sh s, u8 simm) { insti(a, 0b00100010, d, n, imm12, s, simm); }
-void add(Assembler &a, Reg d, Reg n, Reg m)
+static void inst3r2(Assembler &a, bool spd, u8 c1, u16 c2, Reg d, Reg n, Reg m)
 {
 	if (issp(d) || issp(n))
-		return add(a, d, n, m, d.sf ? UXTX : UXTW, 0);
-	return add(a, d, n, m, LSL, 0);
+		return inste(a, spd, c2, d, n, m, d.sf ? UXTX : UXTW, 0);
+	return insts(a, c1, d, n, m, LSL, 0);
 }
 
-void sub(Assembler &a, Reg d, Reg n, Reg m, Ex e, u8 imm3) { inste(a, 0b1001011001, d, n, m, e, imm3); }
+void add(Assembler &a, Reg d, Reg n, Reg m, Ex e, u8 imm3) { inste(a, true, 0b0001011001, d, n, m, e, imm3); }
+void add(Assembler &a, Reg d, Reg n, Reg m, Sh s, u8 imm6) { insts(a, 0b0001011, d, n, m, s, imm6); }
+void add(Assembler &a, Reg d, Reg n, u16 imm12, Sh s, u8 simm) { insti(a, true, 0b00100010, d, n, imm12, s, simm); }
+void add(Assembler &a, Reg d, Reg n, Reg m) { inst3r2(a, true, 0b0001011, 0b0001011001, d, n, m); }
+
+void sub(Assembler &a, Reg d, Reg n, Reg m, Ex e, u8 imm3) { inste(a, true, 0b1001011001, d, n, m, e, imm3); }
 void sub(Assembler &a, Reg d, Reg n, Reg m, Sh s, u8 imm6) { insts(a, 0b1001011, d, n, m, s, imm6); }
-void sub(Assembler &a, Reg d, Reg n, u16 imm12, Sh s, u8 simm) { insti(a, 0b10100010, d, n, imm12, s, simm); }
-void sub(Assembler &a, Reg d, Reg n, Reg m)
-{
-	if (issp(d) || issp(n))
-		return sub(a, d, n, m, d.sf ? UXTX : UXTW, 0);
-	return sub(a, d, n, m, LSL, 0);
-}
+void sub(Assembler &a, Reg d, Reg n, u16 imm12, Sh s, u8 simm) { insti(a, true, 0b10100010, d, n, imm12, s, simm); }
+void sub(Assembler &a, Reg d, Reg n, Reg m) { inst3r2(a, true, 0b1001011, 0b1001011001, d, n, m); }
+
+void adds(Assembler &a, Reg d, Reg n, Reg m, Ex e, u8 imm3) { inste(a, false, 0b0101011001, d, n, m, e, imm3); }
+void adds(Assembler &a, Reg d, Reg n, Reg m, Sh s, u8 imm6) { insts(a, 0b0101011, d, n, m, s, imm6); }
+void adds(Assembler &a, Reg d, Reg n, u16 imm12, Sh s, u8 simm) { insti(a, false, 0b01100010, d, n, imm12, s, simm); }
+void adds(Assembler &a, Reg d, Reg n, Reg m) { inst3r2(a, false, 0b0101011, 0b0101011001, d, n, m); }
+
+void subs(Assembler &a, Reg d, Reg n, Reg m, Ex e, u8 imm3) { inste(a, false, 0b1101011001, d, n, m, e, imm3); }
+void subs(Assembler &a, Reg d, Reg n, Reg m, Sh s, u8 imm6) { insts(a, 0b1101011, d, n, m, s, imm6); }
+void subs(Assembler &a, Reg d, Reg n, u16 imm12, Sh s, u8 simm) { insti(a, false, 0b11100010, d, n, imm12, s, simm); }
+void subs(Assembler &a, Reg d, Reg n, Reg m) { inst3r2(a, false, 0b1101011, 0b1101011001, d, n, m); }
+
+void cmp(Assembler &a, Reg n, Reg m) { subs(a, xzr, n, m); }
+void cmp(Assembler &a, Reg n, Reg m, Ex e, u8 imm3) { subs(a, xzr, n, m, e, imm3); }
+void cmp(Assembler &a, Reg n, Reg m, Sh s, u8 imm6) { subs(a, xzr, n, m, s, imm6); }
+void cmp(Assembler &a, Reg n, u16 imm12, Sh s, u8 simm) { subs(a, xzr, n, imm12, s, simm); }
 
 void b(Assembler &a, const char *label)
 {
@@ -203,5 +215,30 @@ void b(Assembler &a, Cond c, const char *label)
 	push_inst(a, i);
 	label_ref(a, label, a.ip - 4, a.ip - 4, 4, 19, 5);
 }
+
+void bl(Assembler &a, const char *label)
+{
+	Inst i = {};
+	push_bits(i, 0, 26); // label placeholder
+	push_bits(i, 0b100101, 6);
+	push_inst(a, i);
+	label_ref(a, label, a.ip - 4, a.ip - 4, 4, 26, 0);
+}
+
+static void branchreg(Assembler &a, u32 c, Reg n)
+{
+	if (issp(n)) {
+		a.err = ErrReg;
+		return udf(a, 0);
+	}
+	Inst i = {};
+	push_bits(i, 0, 5);
+	push_bits(i, n.code, 5);
+	push_bits(i, c, 22);
+	push_inst(a, i);
+}
+
+void br(Assembler &a, Reg n)  { branchreg(a, 0b1101011000011111000000, n); }
+void blr(Assembler &a, Reg n) { branchreg(a, 0b1101011000111111000000, n); }
 
 }
