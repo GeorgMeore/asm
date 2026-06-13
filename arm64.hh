@@ -111,5 +111,6 @@ void b(Assembler &a, Cond c, const char *label);
 void bl(Assembler &a, const char *label);
 void br(Assembler &a, Reg n);
 void blr(Assembler &a, Reg n);
+void ret(Assembler &a, Reg n = lr);
 
 }

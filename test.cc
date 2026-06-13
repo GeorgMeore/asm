@@ -166,6 +166,7 @@ label(a, "bar");
 	subs(a, x5, x6, 1234, LSL, 12); expect(a, {0xc5, 0x48, 0x53, 0xf1});
 	cmp(a, x17, xzr);               expect(a, {0x3f, 0x02, 0x1f, 0xeb});
 	cmp(a, x5, 100);                expect(a, {0xbf, 0x90, 0x01, 0xf1});
+	ret(a);                         expect(a, {0xc0, 0x03, 0x5f, 0xd6});
 	clear(a);
 }
 

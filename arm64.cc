@@ -240,5 +240,6 @@ static void branchreg(Assembler &a, u32 c, Reg n)
 
 void br(Assembler &a, Reg n)  { branchreg(a, 0b1101011000011111000000, n); }
 void blr(Assembler &a, Reg n) { branchreg(a, 0b1101011000111111000000, n); }
+void ret(Assembler &a, Reg n) { branchreg(a, 0b1101011001011111000000, n); }
 
 }
