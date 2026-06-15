@@ -101,8 +101,14 @@ void adc(Assembler &a, Reg d, Reg n, Reg m)  { return inst3r(a, 0, 0b0011010000,
 void sdiv(Assembler &a, Reg d, Reg n, Reg m) { return inst3r(a, 3, 0b0011010110, d, n, m); }
 void udiv(Assembler &a, Reg d, Reg n, Reg m) { return inst3r(a, 2, 0b0011010110, d, n, m); }
 
-static void inste(Assembler &a, bool spd, u16 c, Reg d, Reg n, Reg m, Ex e, u8 imm3)
+static bool testbit(u64 v, u8 bit)
 {
+	return (v >> bit) & 1;
+}
+
+static void inste(Assembler &a, u16 c, Reg d, Reg n, Reg m, Ex e, u8 imm3)
+{
+	bool spd = !testbit(c, 8);
 	if ((spd && iszr(d)) || (!spd && issp(d)) || iszr(n) || issp(m)) {
 		a.err = ErrReg;
 		return udf(a, 0);
@@ -144,8 +150,9 @@ static void insts(Assembler &a, u8 c, Reg d, Reg n, Reg m, Sh s, u8 imm6)
 	push_inst(a, i);
 }
 
-static void insti(Assembler &a, bool spd, u8 c, Reg d, Reg n, u16 imm12, Sh s, u8 simm)
+static void insti(Assembler &a, u8 c, Reg d, Reg n, u16 imm12, Sh s, u8 simm)
 {
+	bool spd = !testbit(c, 6);
 	if ((spd && iszr(d)) || (!spd && issp(d)) || iszr(n)) {
 		a.err = ErrReg;
 		return udf(a, 0);
@@ -164,32 +171,32 @@ static void insti(Assembler &a, bool spd, u8 c, Reg d, Reg n, u16 imm12, Sh s, u
 	push_inst(a, i);
 }
 
-static void inst3r2(Assembler &a, bool spd, u8 c1, u16 c2, Reg d, Reg n, Reg m)
+static void inst3r2(Assembler &a, u8 c1, u16 c2, Reg d, Reg n, Reg m)
 {
 	if (issp(d) || issp(n))
-		return inste(a, spd, c2, d, n, m, d.sf ? UXTX : UXTW, 0);
+		return inste(a, c2, d, n, m, d.sf ? UXTX : UXTW, 0);
 	return insts(a, c1, d, n, m, LSL, 0);
 }
 
-void add(Assembler &a, Reg d, Reg n, Reg m, Ex e, u8 imm3) { inste(a, true, 0b0001011001, d, n, m, e, imm3); }
+void add(Assembler &a, Reg d, Reg n, Reg m, Ex e, u8 imm3) { inste(a, 0b0001011001, d, n, m, e, imm3); }
 void add(Assembler &a, Reg d, Reg n, Reg m, Sh s, u8 imm6) { insts(a, 0b0001011, d, n, m, s, imm6); }
-void add(Assembler &a, Reg d, Reg n, u16 imm12, Sh s, u8 simm) { insti(a, true, 0b00100010, d, n, imm12, s, simm); }
-void add(Assembler &a, Reg d, Reg n, Reg m) { inst3r2(a, true, 0b0001011, 0b0001011001, d, n, m); }
+void add(Assembler &a, Reg d, Reg n, u16 imm12, Sh s, u8 simm) { insti(a, 0b00100010, d, n, imm12, s, simm); }
+void add(Assembler &a, Reg d, Reg n, Reg m) { inst3r2(a, 0b0001011, 0b0001011001, d, n, m); }
 
-void sub(Assembler &a, Reg d, Reg n, Reg m, Ex e, u8 imm3) { inste(a, true, 0b1001011001, d, n, m, e, imm3); }
+void sub(Assembler &a, Reg d, Reg n, Reg m, Ex e, u8 imm3) { inste(a, 0b1001011001, d, n, m, e, imm3); }
 void sub(Assembler &a, Reg d, Reg n, Reg m, Sh s, u8 imm6) { insts(a, 0b1001011, d, n, m, s, imm6); }
-void sub(Assembler &a, Reg d, Reg n, u16 imm12, Sh s, u8 simm) { insti(a, true, 0b10100010, d, n, imm12, s, simm); }
-void sub(Assembler &a, Reg d, Reg n, Reg m) { inst3r2(a, true, 0b1001011, 0b1001011001, d, n, m); }
+void sub(Assembler &a, Reg d, Reg n, u16 imm12, Sh s, u8 simm) { insti(a, 0b10100010, d, n, imm12, s, simm); }
+void sub(Assembler &a, Reg d, Reg n, Reg m) { inst3r2(a, 0b1001011, 0b1001011001, d, n, m); }
 
-void adds(Assembler &a, Reg d, Reg n, Reg m, Ex e, u8 imm3) { inste(a, false, 0b0101011001, d, n, m, e, imm3); }
+void adds(Assembler &a, Reg d, Reg n, Reg m, Ex e, u8 imm3) { inste(a, 0b0101011001, d, n, m, e, imm3); }
 void adds(Assembler &a, Reg d, Reg n, Reg m, Sh s, u8 imm6) { insts(a, 0b0101011, d, n, m, s, imm6); }
-void adds(Assembler &a, Reg d, Reg n, u16 imm12, Sh s, u8 simm) { insti(a, false, 0b01100010, d, n, imm12, s, simm); }
-void adds(Assembler &a, Reg d, Reg n, Reg m) { inst3r2(a, false, 0b0101011, 0b0101011001, d, n, m); }
+void adds(Assembler &a, Reg d, Reg n, u16 imm12, Sh s, u8 simm) { insti(a, 0b01100010, d, n, imm12, s, simm); }
+void adds(Assembler &a, Reg d, Reg n, Reg m) { inst3r2(a, 0b0101011, 0b0101011001, d, n, m); }
 
-void subs(Assembler &a, Reg d, Reg n, Reg m, Ex e, u8 imm3) { inste(a, false, 0b1101011001, d, n, m, e, imm3); }
+void subs(Assembler &a, Reg d, Reg n, Reg m, Ex e, u8 imm3) { inste(a, 0b1101011001, d, n, m, e, imm3); }
 void subs(Assembler &a, Reg d, Reg n, Reg m, Sh s, u8 imm6) { insts(a, 0b1101011, d, n, m, s, imm6); }
-void subs(Assembler &a, Reg d, Reg n, u16 imm12, Sh s, u8 simm) { insti(a, false, 0b11100010, d, n, imm12, s, simm); }
-void subs(Assembler &a, Reg d, Reg n, Reg m) { inst3r2(a, false, 0b1101011, 0b1101011001, d, n, m); }
+void subs(Assembler &a, Reg d, Reg n, u16 imm12, Sh s, u8 simm) { insti(a, 0b11100010, d, n, imm12, s, simm); }
+void subs(Assembler &a, Reg d, Reg n, Reg m) { inst3r2(a, 0b1101011, 0b1101011001, d, n, m); }
 
 void cmp(Assembler &a, Reg n, Reg m) { subs(a, xzr, n, m); }
 void cmp(Assembler &a, Reg n, Reg m, Ex e, u8 imm3) { subs(a, xzr, n, m, e, imm3); }
