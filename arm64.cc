@@ -274,7 +274,7 @@ static void push_logical(Inst &i, Logical l)
 {
 	// I actually wonder why arm chose such a fucked up way of
 	// encoding imms and not simply l.size | (l.ones - 1)
-	push_bits(i, ((~l.size ^ (l.size - 1)) & 0x3f) | (l.ones - 1) , 6);
+	push_bits(i, (~(l.size*2 - 1) & 0x3f) | (l.ones - 1) , 6);
 	push_bits(i, l.rot, 6);
 	push_bits(i, l.size == 64, 1);
 }
