@@ -243,31 +243,30 @@ struct Logical {
 
 static Logical encode(u64 v, u8 vsize)
 {
-	for (u8 size = vsize; size > 1; size /= 2) {
-		u64 mask = (u64)-1 >> (64 - size);
-		u64 seg = v & mask;
-		if (!seg || !(seg ^ mask))
-			continue; // reject 1* and 0*
-		u64 miss = 0;
-		for (u8 i = 0; i < vsize; i += size)
-			miss |= seg ^ ((v >> i) & mask);
-		if (miss)
-			continue; // seg does not repeat
-		u8 ones = cnt1(seg);
-		u8 rot;
-		if (seg & 1) { // 1*0*1*
-			u64 top = seg & (seg + 1);
-			if ((top + lsb(top)) & mask)
-				continue;
-			rot = cnt1(top);
-		} else {       // 0*1*0*
-			if (seg & (seg + lsb(seg)))
-				continue;
-			rot = ones + nlz(seg) - (64 - size);
-		}
-		return Logical{size, ones, rot};
+	u8 size = vsize;
+	u64 mask = (u64)-1 >> (64 - size);
+	for (u8 tmp = size/2; tmp; tmp /= 2) {
+		u64 tmask = mask >> tmp;
+		if ((v & tmask) != ((v >> tmp) & tmask))
+			break;
+		size = tmp, mask = tmask;
 	}
-	return Logical{};
+	u64 seg = v & mask;
+	if (!seg || !(seg ^ mask))
+		return Logical{}; // reject 1* and 0*
+	u8 ones = cnt1(seg);
+	u8 rot;
+	if (seg & 1) { // 1*0*1*
+		u64 top = seg & (seg + 1);
+		if ((top + lsb(top)) & mask)
+			return Logical{};
+		rot = cnt1(top);
+	} else {       // 0*1*0*
+		if (seg & (seg + lsb(seg)))
+			return Logical{};
+		rot = ones + nlz(seg) - (64 - size);
+	}
+	return Logical{size, ones, rot};
 }
 
 static void push_logical(Inst &i, Logical l)
