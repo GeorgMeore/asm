@@ -43,6 +43,7 @@ extern const Reg sp,  wsp;
 enum Error {
 	ErrReg = AsmErrCount,
 	ErrSize,
+	ErrLogical,
 };
 
 enum Cond {
@@ -111,6 +112,9 @@ void b(Assembler &a, Cond c, const char *label);
 void bl(Assembler &a, const char *label);
 void br(Assembler &a, Reg n);
 void blr(Assembler &a, Reg n);
+void orr(Assembler &a, Reg d, Reg n, Reg m, Sh s = LSL, u8 imm6 = 0);
+void orr(Assembler &a, Reg d, Reg n, u64 imm);
+void mov(Assembler &a, Reg d, Reg n);
 void ret(Assembler &a, Reg n = lr);
 
 }

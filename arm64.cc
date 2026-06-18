@@ -203,6 +203,112 @@ void cmp(Assembler &a, Reg n, Reg m, Ex e, u8 imm3) { subs(a, xzr, n, m, e, imm3
 void cmp(Assembler &a, Reg n, Reg m, Sh s, u8 imm6) { subs(a, xzr, n, m, s, imm6); }
 void cmp(Assembler &a, Reg n, u16 imm12, Sh s, u8 simm) { subs(a, xzr, n, imm12, s, simm); }
 
+static u64 lsb(u64 x)
+{
+	return x ^ (x & (x - 1));
+}
+
+static u8 cnt1(u64 x)
+{
+	x = x - ((x >> 1) & 0x5555555555555555);
+	x = (x & 0x3333333333333333) + ((x >> 2) & 0x3333333333333333);
+	x = (x + (x >> 4)) & 0x0F0F0F0F0F0F0F0F;
+	return (x * 0x0101010101010101) >> 56;
+}
+
+static u8 nlz(u64 x)
+{
+	u8 n = 64;
+	u8 c;
+	c = !!(x >> 32) << 5;
+	x >>= c, n -= c;
+	c = !!(x >> 16) << 4;
+	x >>= c, n -= c;
+	c = !!(x >> 8) << 3;
+	x >>= c, n -= c;
+	c = !!(x >> 4) << 2;
+	x >>= c, n -= c;
+	c = !!(x >> 2) << 1;
+	x >>= c, n -= c;
+	c = x >> 1;
+	x >>= c, n -= c;
+	return (n - x);
+}
+
+struct Logical {
+	u8 size;
+	u8 ones;
+	u8 rot;
+};
+
+static Logical encode(u64 v, u8 vsize)
+{
+	for (u8 size = vsize; size > 1; size /= 2) {
+		u64 mask = (u64)-1 >> (64 - size);
+		u64 seg = v & mask;
+		if (!seg || !(seg ^ mask))
+			continue; // reject 1* and 0*
+		u64 miss = 0;
+		for (u8 i = 0; i < vsize; i += size)
+			miss |= seg ^ ((v >> i) & mask);
+		if (miss)
+			continue; // seg does not repeat
+		u8 ones = cnt1(seg);
+		u8 rot;
+		if (seg & 1) { // 1*0*1*
+			u64 top = seg & (seg + 1);
+			if ((top + lsb(top)) & mask)
+				continue;
+			rot = cnt1(top);
+		} else {       // 0*1*0*
+			if (seg & (seg + lsb(seg)))
+				continue;
+			rot = ones + nlz(seg) - (64 - size);
+		}
+		return Logical{size, ones, rot};
+	}
+	return Logical{};
+}
+
+static void push_logical(Inst &i, Logical l)
+{
+	push_bits(i, ((~l.size ^ (l.size - 1)) & 0x3f) | (l.ones - 1) , 6);
+	push_bits(i, l.rot, 6);
+	push_bits(i, l.size == 64, 1);
+}
+
+void orr(Assembler &a, Reg d, Reg n, u64 imm)
+{
+	if (d.sf != n.sf || (!d.sf && (u32)imm != imm)) {
+		a.err = ErrSize;
+		return udf(a, 0);
+	}
+	Logical l = encode(imm, 32<<d.sf);
+	if (!l.size) {
+		a.err = ErrLogical;
+		return udf(a, 0);
+	}
+	Inst i = {};
+	push_bits(i, d.code, 5);
+	push_bits(i, n.code, 5);
+	push_logical(i, l);
+	push_bits(i, 0b01100100, 8);
+	push_bits(i, d.sf, 1);
+	push_inst(a, i);
+}
+
+void orr(Assembler &a, Reg d, Reg n, Reg m, Sh s, u8 imm6) { insts(a, 0b0101010, d, n, m, s, imm6); }
+
+void mov(Assembler &a, Reg d, Reg n)
+{
+	if (issp(d) || issp(n))
+		return add(a, d, n, 0);
+	if (d.sf)
+		return orr(a, d, xzr, n);
+	else
+		return orr(a, d, wzr, n);
+}
+
 void b(Assembler &a, const char *label)
 {
 	Inst i = {};
