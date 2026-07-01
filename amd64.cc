@@ -5,6 +5,8 @@
 #include "asm.hh"
 #include "amd64.hh"
 
+// Reference: https://www.felixcloutier.com/x86/
+
 namespace amd64 {
 
 const Reg rax = {0,  64}, eax  = {0,  32}, ax   = {0,  16}, al   = {0,  8};

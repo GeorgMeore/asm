@@ -5,6 +5,8 @@
 #include "asm.hh"
 #include "arm64.hh"
 
+// Reference: https://developer.arm.com/documentation/ddi0602/2026-03/Base-Instructions/
+
 namespace arm64 {
 
 const Reg x0  = {0,  true, false}, w0  = {0,  false, false};
